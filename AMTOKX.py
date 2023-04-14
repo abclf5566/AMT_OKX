@@ -40,7 +40,7 @@ async def webhook():
     if direction == "test" or direction == "TEST":
         return{
             'code': 0,
-            'message':'Test donn!!!!'
+            'message':'Test donn!'
         }
     accountAPI.set_leverage(instId=instrument_id, lever=5, mgnMode='cross')
 
@@ -75,6 +75,22 @@ async def webhook():
             'code': 200,
             'message': 'OK'
         }
+    
+    # 先检查是否有多头仓位，如果有则平掉
+    positions = accountAPI.get_positions(instId=instrument_id)
+    long_position = None
+    short_position = None
+
+    for position in positions['data']:
+        if position['side'] == 'long':
+            long_position = position
+        elif position['side'] == 'short':
+            short_position = position
+
+    # 如果有多头仓位且信号为做空，先平掉多头仓位
+    if long_position and direction == "Short Entry":
+        close_long_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="cross")
+        print(f"Closed long position: {close_long_order}")    
 
     if direction == "Long Entry" or direction == "Short Entry":
         order = tradeAPI.place_order(
