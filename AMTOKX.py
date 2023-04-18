@@ -1,8 +1,6 @@
 import json
-import time
 import okx.Account as Account
 import okx.Trade as Trade
-import math
 import okx.PublicData as Public
 from quart import Quart, request
 import hupper
@@ -21,10 +19,7 @@ publicAPI = Public.PublicAPI(api_key, secret_key, passphrase, False, flag)
 
 app = Quart(__name__)
 
-instrument_id = 'ETH-USDT-SWAP'
-
-ticker = publicAPI.get_instruments(instType='SWAP', instId=instrument_id)
-lot_size = float(ticker['data'][0]['lotSz'])
+instrument_id = 'AVAX-USDT-SWAP'
 
 open_long_order_id = None
 open_short_order_id = None
@@ -37,46 +32,15 @@ async def webhook():
     data = await request.get_json()
     entry_price = float(data['price'])
     direction = data['direction']
-    if direction == "test" or direction == "TEST":
-        return{
-            'code': 0,
-            'message':'Test donn!'
-        }
-    accountAPI.set_leverage(instId=instrument_id, lever=5, mgnMode='cross')
 
-    accounts = accountAPI.get_account_balance()
-    for item in accounts['data'][0]['details']:
-        if item['ccy'] == 'USDT':
-            usdt_balance = float(item['availBal'])
-            break
-
-    rounded_usdt_balance = math.floor(usdt_balance)
+    accountAPI.set_leverage(instId=instrument_id, lever=5, mgnMode='isolated')
 
     side = None
     if direction == "Long Entry":
         side = 'buy'
     elif direction == "Short Entry":
         side = 'sell'
-    elif direction == "Close Long Entry":
-        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="cross")
-        side = 'sell'
-        print(f"Closed long position: {close_order}")
-        open_long_order_id = None
-        return {
-            'code': 200,
-            'message': 'OK'
-        }
-    elif direction == "Close Short Entry":
-        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="cross")
-        side = 'buy'
-        print(f"Closed short position: {close_order}")
-        open_short_order_id = None
-        return {
-            'code': 200,
-            'message': 'OK'
-        }
-    
-    # 先检查是否有多头仓位，如果有则平掉
+
     positions = accountAPI.get_positions(instId=instrument_id)
     long_position = None
     short_position = None
@@ -87,38 +51,53 @@ async def webhook():
         elif position['side'] == 'short':
             short_position = position
 
-    # 如果有多头仓位且信号为做空，先平掉多头仓位
     if long_position and direction == "Short Entry":
-        close_long_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="cross")
-        print(f"Closed long position: {close_long_order}")    
-
-    if direction == "Long Entry" or direction == "Short Entry":
-        order = tradeAPI.place_order(
-            instId=instrument_id,
-            tdMode='cross',
-            side=side,
-            ordType='limit',
-            px=entry_price,
-            sz=1
-        )
-
-        if direction == "Long Entry":
-            open_long_order_id = order['data'][0]['ordId']
-        elif direction == "Short Entry":
-            open_short_order_id = order['data'][0]['ordId']
-
-        print(order)
-
+        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+        print(f"Closed long position: {close_order}")
+    elif short_position and direction == "Long Entry":
+        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+        print(f"Closed short position: {close_order}")
+    elif direction == "Exit":
+        if long_position:
+            close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+            print(f"Closed long position: {close_order}")
+        if short_position:
+            close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+            print(f"Closed short position: {close_order}")
         return {
             'code': 200,
             'message': 'OK'
         }
-    
     else:
         return {
-            'code': 400,
-            'message': 'Invalid direction'
+            'code': 200,
+            'message': 'No action taken, position direction matches signal'
         }
+    
+    trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
+    max_buy = trade_size["data"][0]["maxBuy"]
+    print(max_buy)
+
+    order = tradeAPI.place_order(
+        instId=instrument_id,
+        tdMode='cross',
+        side=side,
+        ordType='limit',
+        px=entry_price,
+        sz=max_buy
+    )
+
+    if direction == "Long Entry":
+        open_long_order_id = order['data'][0]['ordId']
+    elif direction == "Short Entry":
+        open_short_order_id = order['data'][0]['ordId']
+
+    print(order)
+
+    return {
+        'code': 200,
+        'message': 'OK'
+    }
 
 if __name__ == '__main__':
     reloader = hupper.start_reloader(f'{__name__}:app.run')

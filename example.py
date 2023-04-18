@@ -206,7 +206,10 @@ if __name__ == '__main__':
     # 系统状态API(仅适用于实盘) system status
     Status = Status.StatusAPI(api_key, secret_key, passphrase, False, flag)
     # 查看系统的升级状态
-    instrument_id = 'ETH-USDT-SWAP'
+    instrument_id = 'AVAX-USDT-SWAP'
     aaa = accountAPI.get_positions(instId=instrument_id)
+    #獲取最大可交易數量
+    result = accountAPI.get_maximum_trade_size(instId=instrument_id,tdMode='isolated')
+    max_buy = result["data"][0]["maxBuy"]
     #result = Status.status()
-    print(json.dumps(aaa))
+    print(json.dumps(max_buy))
