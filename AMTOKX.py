@@ -4,6 +4,8 @@ import okx.Trade as Trade
 import okx.PublicData as Public
 from quart import Quart, request
 import hupper
+from tool.function import get_precision
+
 
 with open("accinfo.json", "r") as f:
     data = json.load(f)
@@ -31,6 +33,11 @@ async def webhook():
 
     data = await request.get_json()
     entry_price = float(data['price'])
+    price_precision = get_precision(instrument_id)
+    if price_precision:
+        entry_price = round(entry_price, price_precision)
+    else:
+        print("Error: Unable to get price precision.")
     direction = data['direction']
 
     accountAPI.set_leverage(instId=instrument_id, lever=5, mgnMode='isolated')
@@ -69,35 +76,36 @@ async def webhook():
             'message': 'OK'
         }
     else:
-        return {
-            'code': 200,
-            'message': 'No action taken, position direction matches signal'
-        }
-    
-    trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
-    max_buy = trade_size["data"][0]["maxBuy"]
-    print(max_buy)
+        if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":
+            trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
+            max_buy = trade_size["data"][0]["maxBuy"]
+            print(max_buy)
 
-    order = tradeAPI.place_order(
-        instId=instrument_id,
-        tdMode='cross',
-        side=side,
-        ordType='limit',
-        px=entry_price,
-        sz=max_buy
-    )
+            order = tradeAPI.place_order(
+                instId=instrument_id,
+                tdMode='isolated',
+                side=side,
+                ordType='limit',
+                px=entry_price,
+                sz=max_buy
+            )
 
-    if direction == "Long Entry":
-        open_long_order_id = order['data'][0]['ordId']
-    elif direction == "Short Entry":
-        open_short_order_id = order['data'][0]['ordId']
+            if direction == "Long Entry":
+                open_long_order_id = order['data'][0]['ordId']
+            elif direction == "Short Entry":
+                open_short_order_id = order['data'][0]['ordId']
 
-    print(order)
+            print(order)
 
-    return {
-        'code': 200,
-        'message': 'OK'
-    }
+            return {
+                'code': 200,
+                'message': 'OK'
+            }
+        else:
+            return {
+                'code': 200,
+                'message': 'No action taken, position direction matches signal'
+            }
 
 if __name__ == '__main__':
     reloader = hupper.start_reloader(f'{__name__}:app.run')
