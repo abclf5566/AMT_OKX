@@ -33,7 +33,7 @@ async def webhook():
 
     data = await request.get_json()
     entry_price = float(data['price'])
-    price_precision = get_precision(instrument_id)
+    price_precision = get_precision(publicAPI,instrument_id)
     if price_precision:
         entry_price = round(entry_price, price_precision)
     else:
