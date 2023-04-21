@@ -6,14 +6,13 @@ from quart import Quart, request
 import hupper
 from tool.function import get_precision
 
-
 with open("accinfo.json", "r") as f:
     data = json.load(f)
 
 api_key = data["api_key"]
 secret_key = data["secret_key"]
 passphrase = data["passphrase"]
-flag = '0'
+flag = '0'# 1 
 
 accountAPI = Account.AccountAPI(api_key, secret_key, passphrase, False, flag)
 tradeAPI = Trade.TradeAPI(api_key, secret_key, passphrase, False, flag)
