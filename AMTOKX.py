@@ -3,7 +3,6 @@ import okx.Account as Account
 import okx.Trade as Trade
 import okx.PublicData as Public
 from quart import Quart, request
-import hupper
 from tool.function import get_precision
 
 with open("accinfo.json", "r") as f:
@@ -12,7 +11,7 @@ with open("accinfo.json", "r") as f:
 api_key = data["api_key"]
 secret_key = data["secret_key"]
 passphrase = data["passphrase"]
-flag = '0'# 1 
+flag = '0'
 
 accountAPI = Account.AccountAPI(api_key, secret_key, passphrase, False, flag)
 tradeAPI = Trade.TradeAPI(api_key, secret_key, passphrase, False, flag)
@@ -52,9 +51,10 @@ async def webhook():
     short_position = None
 
     for position in positions['data']:
-        if position['side'] == 'long':
+        pos = float(position['pos'])
+        if pos > 0:
             long_position = position
-        elif position['side'] == 'short':
+        elif pos < 0:
             short_position = position
 
     if long_position and direction == "Short Entry":
@@ -78,7 +78,6 @@ async def webhook():
         if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":
             trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
             max_buy = trade_size["data"][0]["maxBuy"]
-            print(max_buy)
 
             order = tradeAPI.place_order(
                 instId=instrument_id,
@@ -107,5 +106,4 @@ async def webhook():
             }
 
 if __name__ == '__main__':
-    reloader = hupper.start_reloader(f'{__name__}:app.run')
-    reloader.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080)

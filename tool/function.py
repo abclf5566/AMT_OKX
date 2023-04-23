@@ -9,3 +9,4 @@ def get_precision(public_api, inst_id):
             else:
                 return 0
     return None
+
