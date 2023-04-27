@@ -3,7 +3,7 @@ import okx.Account as Account
 import okx.Trade as Trade
 import okx.PublicData as Public
 from quart import Quart, request
-from tool.function import get_precision
+import tool.function as fn
 
 with open("accinfo.json", "r") as f:
     data = json.load(f)
@@ -28,9 +28,9 @@ open_short_order_id = None
 trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
 max_buy = trade_size["data"][0]["maxBuy"]
 code_203 = data['message'][3]['code 200']
-
+def aaa():
+    if 3==3:
+        return data['message'][3]['code 200']
 if __name__ == '__main__':
     # app.run(host='0.0.0.0', port=8080)
-    print(code_203)
-    print(data['message'][0]['code 201'])
-    print(data['message'][1]['code 202'])
+    print(fn.get_message_code(data, 'code 200'))

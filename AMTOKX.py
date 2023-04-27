@@ -85,7 +85,7 @@ async def webhook():
             print(f"Closed short position: {close_order}")
             await wait_for_close_order(close_order['data'][0]['ordId'])
 
-        return data['message'][0]['code 201']
+        return fn.get_message_code(data, 'code 201')
     
     else:
         if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":
@@ -108,13 +108,14 @@ async def webhook():
 
             print(order)
 
-            return data['message'][1]['code 202']
+            return fn.get_message_code(data, 'code 202')
         else:
-            return data['message'][3]['code 200']
+            return fn.get_message_code(data, 'code 200')
 
 if __name__ == '__main__':
     try:
         app.run(host='0.0.0.0', port=8080)
+        print(fn.get_message_code(data, 'code 200'))
     except (KeyboardInterrupt, SystemExit, GeneratorExit):
         print("Shutting down the server gracefully...")
     except Exception as e:
