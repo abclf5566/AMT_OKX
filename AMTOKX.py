@@ -70,10 +70,12 @@ async def webhook():
         close_order = await fn.close_position(instrument_id, tradeAPI)
         print(f"Closed long position: {close_order}")
         await wait_for_close_order(close_order['data'][0]['ordId'])
+        long_position = None
     elif short_position and direction == "Long Entry":
         close_order = await fn.close_position(instrument_id, tradeAPI)
         print(f"Closed short position: {close_order}")
         await wait_for_close_order(close_order['data'][0]['ordId'])
+        short_position = None
         
     elif direction == "Exit":
         if long_position:
@@ -85,7 +87,7 @@ async def webhook():
             print(f"Closed short position: {close_order}")
             await wait_for_close_order(close_order['data'][0]['ordId'])
 
-        return fn.get_message_code(data, 'code 201')
+        return {'code': 201,'message': "Order EXIT DONE"}
     
     else:
         if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":
@@ -108,14 +110,14 @@ async def webhook():
 
             print(order)
 
-            return fn.get_message_code(data, 'code 202')
+            return {'code': 202,'message': "Long Entry / Short Entry DONE"}
         else:
-            return fn.get_message_code(data, 'code 200')
+            return {'code': 200,'message': "No action taken, position direction matches signal"}
+
 
 if __name__ == '__main__':
     try:
         app.run(host='0.0.0.0', port=8080)
-        print(fn.get_message_code(data, 'code 200'))
     except (KeyboardInterrupt, SystemExit, GeneratorExit):
         print("Shutting down the server gracefully...")
     except Exception as e:
