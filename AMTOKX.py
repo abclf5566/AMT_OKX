@@ -3,7 +3,8 @@ import okx.Account as Account
 import okx.Trade as Trade
 import okx.PublicData as Public
 from quart import Quart, request
-from tool.function import get_precision
+import tool.function as fn
+import asyncio
 
 with open("accinfo.json", "r") as f:
     data = json.load(f)
@@ -26,12 +27,20 @@ open_short_order_id = None
 
 @app.route('/webhook', methods=['POST'])
 async def webhook():
+    async def wait_for_close_order(ordId):
+        while True:
+            order_info = tradeAPI.get_order(instId=instrument_id, ordId=ordId)
+            if order_info['data'][0]['state'] == 'filled':
+                break
+            await asyncio.sleep(1)  # 等待1秒再次檢查訂單狀態
+
+
     global open_long_order_id
     global open_short_order_id
 
     data = await request.get_json()
     entry_price = float(data['price'])
-    price_precision = get_precision(publicAPI, instrument_id)
+    price_precision = fn.get_precision(publicAPI, instrument_id)
     if price_precision:
         entry_price = round(entry_price, price_precision)
     else:
@@ -58,22 +67,26 @@ async def webhook():
             short_position = position
 
     if long_position and direction == "Short Entry":
-        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+        close_order = await fn.close_position(instrument_id, tradeAPI)
         print(f"Closed long position: {close_order}")
+        await wait_for_close_order(close_order['data'][0]['ordId'])
     elif short_position and direction == "Long Entry":
-        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+        close_order = await fn.close_position(instrument_id, tradeAPI)
         print(f"Closed short position: {close_order}")
+        await wait_for_close_order(close_order['data'][0]['ordId'])
+        
     elif direction == "Exit":
         if long_position:
-            close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+            close_order = await fn.close_position(instrument_id, tradeAPI)
             print(f"Closed long position: {close_order}")
+            await wait_for_close_order(close_order['data'][0]['ordId'])
         if short_position:
-            close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+            close_order = await fn.close_position(instrument_id, tradeAPI)
             print(f"Closed short position: {close_order}")
-        return {
-            'code': 200,
-            'message': 'OK'
-        }
+            await wait_for_close_order(close_order['data'][0]['ordId'])
+
+        return data['message'][0]['code 201']
+    
     else:
         if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":
             trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
@@ -95,15 +108,14 @@ async def webhook():
 
             print(order)
 
-            return {
-                'code': 200,
-                'message': 'OK'
-            }
+            return data['message'][1]['code 202']
         else:
-            return {
-                'code': 200,
-                'message': 'No action taken, position direction matches signal'
-            }
+            return data['message'][3]['code 200']
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    try:
+        app.run(host='0.0.0.0', port=8080)
+    except (KeyboardInterrupt, SystemExit, GeneratorExit):
+        print("Shutting down the server gracefully...")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")

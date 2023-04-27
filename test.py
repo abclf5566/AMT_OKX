@@ -27,8 +27,10 @@ open_short_order_id = None
 
 trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
 max_buy = trade_size["data"][0]["maxBuy"]
-
+code_203 = data['message'][3]['code 200']
 
 if __name__ == '__main__':
     # app.run(host='0.0.0.0', port=8080)
-    print(trade_size)
+    print(code_203)
+    print(data['message'][0]['code 201'])
+    print(data['message'][1]['code 202'])
