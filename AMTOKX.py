@@ -60,16 +60,23 @@ async def webhook():
             short_position = position
 
     async def close_positions():
-        await fn.close_positions_if_exists(instrument_id, tradeAPI, long_position, short_position)
-            
+        await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position)
+
     if direction == "Exit":
         await close_positions()
         return {'code': 201,'message': "Order EXIT DONE"}
     
-    if long_position and direction == "Short Entry":
-        await close_positions()
-    elif short_position and direction == "Long Entry":
-        await close_positions()
+    if long_position:
+        close_order = await fn.close_position(instrument_id, tradeAPI)
+        print(f"Closed long position: {close_order}")
+        if close_order['code'] == '0':
+            await fn.wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
+
+    if short_position:
+        close_order = await fn.close_position(instrument_id, tradeAPI)
+        print(f"Closed short position: {close_order}")
+        if close_order['code'] == '0':
+            await fn.wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
 
     else:
         if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":

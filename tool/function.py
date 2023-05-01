@@ -21,39 +21,39 @@ async def close_position(instrument_id, tradeAPI):
         print('Position closed')
     else:
         print(f"Unexpected response: {close_order}")
-    return close_order
+    
+    if close_order['data']:
+        return {"code": close_order['code'], "instId": close_order['data'][0]['instId'], "posSide": close_order['data'][0]['posSide']}
+    else:
+        return {"code": close_order['code'], "instId": None, "posSide": None}
+#need fix
+async def wait_for_close_order(accountAPI, instId, posSide):
+    if instId is None or posSide is None:
+        return
 
-
-async def wait_for_close_order(tradeAPI, instrument_id, instId):
     while True:
-        positions = tradeAPI.get_positions(instId=instrument_id)
-        position_exists = False
-
-        for position in positions['data']:
-            if position['instId'] == instId:
-                position_exists = True
-                break
-
-        if not position_exists:
+        orders = accountAPI.get_orders(instId=instId, state="live", posSide=posSide)
+        if len(orders['data']) == 0:
             break
+        else:
+            await asyncio.sleep(1)
 
-        await asyncio.sleep(1)  # 等待1秒再次检查仓位状态
 
-        
 def get_message_code(data, code):
     for msg in data['message']:
         if code in msg:
             return msg[code]
     return None
 
-async def close_positions_if_exists(instrument_id, tradeAPI, long_position, short_position):
+async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position):
     if long_position:
         close_order = await close_position(instrument_id, tradeAPI)
         print(f"Closed long position: {close_order}")
         if close_order['code'] == '0':
-            await wait_for_close_order(tradeAPI, instrument_id, close_order['data'][0]['ordId'])
+            await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
     if short_position:
         close_order = await close_position(instrument_id, tradeAPI)
         print(f"Closed short position: {close_order}")
         if close_order['code'] == '0':
-            await wait_for_close_order(tradeAPI, instrument_id, close_order['data'][0]['ordId'])
+            await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
+

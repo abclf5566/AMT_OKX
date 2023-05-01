@@ -207,5 +207,5 @@ if __name__ == '__main__':
     Status = Status.StatusAPI(api_key, secret_key, passphrase, False, flag)
     # 查看系统的升级状态
     # result = Status.status()
-    close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
-    print(json.dumps(close_order))
+    positions = accountAPI.get_positions(instId=instrument_id)
+    print(json.dumps(positions))
