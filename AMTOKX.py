@@ -61,7 +61,7 @@ async def webhook():
 
     async def close_positions():
         await fn.close_positions_if_exists(instrument_id, tradeAPI, long_position, short_position)
-        
+            
     if direction == "Exit":
         await close_positions()
         return {'code': 201,'message': "Order EXIT DONE"}
