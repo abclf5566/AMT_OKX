@@ -31,3 +31,13 @@ def get_message_code(data, code):
         if code in msg:
             return msg[code]
     return None
+
+async def close_positions_if_exists():
+    if long_position:
+        close_order = await fn.close_position(instrument_id, tradeAPI)
+        print(f"Closed long position: {close_order}")
+        await wait_for_close_order(tradeAPI, instrument_id, close_order['data'][0]['ordId'])
+    if short_position:
+        close_order = await fn.close_position(instrument_id, tradeAPI)
+        print(f"Closed short position: {close_order}")
+        await wait_for_close_order(tradeAPI, instrument_id, close_order['data'][0]['ordId'])

@@ -27,14 +27,7 @@ open_short_order_id = None
 
 @app.route('/webhook', methods=['POST'])
 async def webhook():
-    async def wait_for_close_order(ordId):
-        while True:
-            order_info = tradeAPI.get_order(instId=instrument_id, ordId=ordId)
-            if order_info['data'][0]['state'] == 'filled':
-                break
-            await asyncio.sleep(1)  # 等待1秒再次檢查訂單狀態
-
-
+    
     global open_long_order_id
     global open_short_order_id
 
@@ -66,29 +59,18 @@ async def webhook():
         elif pos < 0:
             short_position = position
 
-    if long_position and direction == "Short Entry":
-        close_order = await fn.close_position(instrument_id, tradeAPI)
-        print(f"Closed long position: {close_order}")
-        await wait_for_close_order(close_order['data'][0]['ordId'])
-        long_position = None
-    elif short_position and direction == "Long Entry":
-        close_order = await fn.close_position(instrument_id, tradeAPI)
-        print(f"Closed short position: {close_order}")
-        await wait_for_close_order(close_order['data'][0]['ordId'])
-        short_position = None
+    async def close_positions():
+        await fn.close_positions_if_exists(instrument_id, tradeAPI, long_position, short_position)
         
-    elif direction == "Exit":
-        if long_position:
-            close_order = await fn.close_position(instrument_id, tradeAPI)
-            print(f"Closed long position: {close_order}")
-            await wait_for_close_order(close_order['data'][0]['ordId'])
-        if short_position:
-            close_order = await fn.close_position(instrument_id, tradeAPI)
-            print(f"Closed short position: {close_order}")
-            await wait_for_close_order(close_order['data'][0]['ordId'])
-
+    if direction == "Exit":
+        await close_positions()
         return {'code': 201,'message': "Order EXIT DONE"}
     
+    if long_position and direction == "Short Entry":
+        await close_positions()
+    elif short_position and direction == "Long Entry":
+        await close_positions()
+
     else:
         if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":
             trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
