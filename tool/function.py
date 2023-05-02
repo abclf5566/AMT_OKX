@@ -23,20 +23,31 @@ async def close_position(instrument_id, tradeAPI):
         print(f"Unexpected response: {close_order}")
     
     if close_order['data']:
-        return {"code": close_order['code'], "instId": close_order['data'][0]['instId'], "posSide": close_order['data'][0]['posSide']}
+        if 'ordId' in close_order['data'][0]:
+            return {"code": close_order['code'], "ordId": close_order['data'][0]['ordId'], "instId": instrument_id, "posSide": close_order['data'][0]['posSide']}
+        else:
+            return {"code": close_order['code'], "ordId": None, "instId": instrument_id, "posSide": None}
     else:
-        return {"code": close_order['code'], "instId": None, "posSide": None}
-#need fix
+        return {"code": close_order['code'], "ordId": None, "instId": instrument_id, "posSide": None}
+
 async def wait_for_close_order(accountAPI, instId, posSide):
-    if instId is None or posSide is None:
+    if posSide is None:  # 如果 posSide 为 None，则不需要等待
         return
 
     while True:
-        orders = accountAPI.get_orders(instId=instId, state="live", posSide=posSide)
-        if len(orders['data']) == 0:
+        positions = accountAPI.get_positions(instId=instId)
+        position_exists = False
+
+        for position in positions['data']:
+            if position['posSide'] == posSide:
+                position_exists = True
+                break
+
+        if not position_exists:
             break
         else:
             await asyncio.sleep(1)
+
 
 
 def get_message_code(data, code):
@@ -56,4 +67,3 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
         print(f"Closed short position: {close_order}")
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
-
