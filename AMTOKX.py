@@ -25,8 +25,7 @@ open_long_order_id = None
 open_short_order_id = None
 
 @app.route('/webhook', methods=['POST'])
-async def webhook():
-    
+async def webhook():    
     global open_long_order_id
     global open_short_order_id
 
