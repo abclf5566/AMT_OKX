@@ -48,7 +48,17 @@ async def wait_for_close_order(accountAPI, instId, posSide):
         else:
             await asyncio.sleep(1)
 
-
+#cancel all orders in the list
+async def cancel_all_orders(tradeAPI, instId):
+    orders = tradeAPI.get_orders(instId=instId)
+    for order in orders['data']:
+        if order['state'] == 'submitted':
+            cancel_order = tradeAPI.cancel_order(instId=instId, ordId=order['ordId'])
+            print(f"Cancel order: {cancel_order}")
+            if cancel_order['code'] == '0':
+                print('Order cancelled')
+            else:
+                print(f"Unexpected response: {cancel_order}")
 
 def get_message_code(data, code):
     for msg in data['message']:
