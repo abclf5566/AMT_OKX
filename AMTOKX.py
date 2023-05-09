@@ -77,6 +77,29 @@ async def webhook():
         print(f"Closed short position: {close_order}")
         if close_order['code'] == '0':
             await fn.wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
+=======
+
+    if long_position and direction == "Short Entry":
+        close_order = await fn.close_position(instrument_id, long_position['posId'], tradeAPI)
+        print(f"Closed long position: {close_order}")
+        await wait_for_close_order(close_order['data'][0]['ordId'])
+        long_position = None
+    elif short_position and direction == "Long Entry":
+        close_order = await fn.close_position(instrument_id, short_position['posId'], tradeAPI)
+        print(f"Closed short position: {close_order}")
+        await wait_for_close_order(close_order['data'][0]['ordId'])
+        short_position = None
+            
+    elif direction == "Exit":
+        if long_position:
+            close_order = await fn.close_position(instrument_id, long_position['posId'], tradeAPI)
+            print(f"Closed long position: {close_order}")
+            await wait_for_close_order(close_order['data'][0]['ordId'])
+        if short_position:
+            close_order = await fn.close_position(instrument_id, short_position['posId'], tradeAPI)
+            print(f"Closed short position: {close_order}")
+            await wait_for_close_order(close_order['data'][0]['ordId'])
+>>>>>>> Stashed changes
 
     else:
         if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":
