@@ -48,8 +48,6 @@ async def wait_for_close_order(accountAPI, instId, posSide):
         else:
             await asyncio.sleep(1)
 
-
-
 def get_message_code(data, code):
     for msg in data['message']:
         if code in msg:

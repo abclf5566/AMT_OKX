@@ -4,7 +4,6 @@ import okx.Trade as Trade
 import okx.PublicData as Public
 from quart import Quart, request
 import tool.function as fn
-import asyncio
 
 with open("accinfo.json", "r") as f:
     data = json.load(f)
@@ -19,7 +18,6 @@ tradeAPI = Trade.TradeAPI(api_key, secret_key, passphrase, False, flag)
 publicAPI = Public.PublicAPI(api_key, secret_key, passphrase, False, flag)
 
 app = Quart(__name__)
-
 instrument_id = 'AVAX-USDT-SWAP'
 
 open_long_order_id = None
@@ -106,10 +104,16 @@ async def webhook():
         else:
             return {'code': 200,'message': "No action taken, position direction matches signal"}
 
+
 if __name__ == '__main__':
     try:
         app.run(host='0.0.0.0', port=8080)
     except (KeyboardInterrupt, SystemExit, GeneratorExit):
         print("Shutting down the server gracefully...")
+    except (ConnectionError, TimeoutError) as e:
+        print(f"Connection or timeout error: {e}")
+    except ValueError as e:
+        print(f"Value error: {e}")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+
