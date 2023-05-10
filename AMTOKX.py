@@ -30,6 +30,9 @@ async def webhook():
     global open_short_order_id
 
     data = await request.get_json()
+    if data is None:
+        return {'code': 400, 'message': "Bad Request: Invalid JSON data"}
+
     direction = data['direction']
 
     if direction != "Exit":
