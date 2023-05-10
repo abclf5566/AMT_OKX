@@ -40,7 +40,6 @@ async def webhook():
         else:
             print("Error: Unable to get price precision.")
 
-
     accountAPI.set_leverage(instId=instrument_id, lever=5, mgnMode='isolated')
 
     side = None
@@ -65,44 +64,48 @@ async def webhook():
 
     if direction == "Exit":
         await close_positions()
-        return {'code': 201,'message': "Order EXIT DONE"}
-    
+        return {'code': 201, 'message': "Order EXIT DONE"}
+
+    # 新增條件檢查，確保當收到相同方向的訊號時，不執行任何操作
+    if long_position and direction == "Long Entry":
+        return {'code': 200, 'message': "No action taken, position direction matches signal"}
+
+    if short_position and direction == "Short Entry":
+        return {'code': 200, 'message': "No action taken, position direction matches signal"}
+
     if long_position:
         close_order = await fn.close_position(instrument_id, tradeAPI)
         print(f"Closed long position: {close_order}")
         if close_order['code'] == '0':
             await fn.wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
-    elif short_position:
+
+    if short_position:
         close_order = await fn.close_position(instrument_id, tradeAPI)
         print(f"Closed short position: {close_order}")
         if close_order['code'] == '0':
             await fn.wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
 
+    trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
+    max_buy = trade_size["data"][0]["maxBuy"]
 
-    else:
-        if not long_position and direction == "Long Entry" or not short_position and direction == "Short Entry":
-            trade_size = accountAPI.get_max_order_size(instId=instrument_id,tdMode='isolated')
-            max_buy = trade_size["data"][0]["maxBuy"]
+    order = tradeAPI.place_order(
+        instId=instrument_id,
+        tdMode='isolated',
+        side=side,
+        ordType='limit',
+        px=entry_price,
+        sz=max_buy
+    )
 
-            order = tradeAPI.place_order(
-                instId=instrument_id,
-                tdMode='isolated',
-                side=side,
-                ordType='limit',
-                px=entry_price,
-                sz=max_buy
-            )
+    if direction == "Long Entry":
+        open_long_order_id = order['data'][0]['ordId']
+    elif direction == "Short Entry":
+        open_short_order_id = order['data'][0]['ordId']
 
-            if direction == "Long Entry":
-                open_long_order_id = order['data'][0]['ordId']
-            elif direction == "Short Entry":
-                open_short_order_id = order['data'][0]['ordId']
+    print(order)
 
-            print(order)
+    return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
 
-            return {'code': 202,'message': "Long Entry / Short Entry DONE"}
-        else:
-            return {'code': 200,'message': "No action taken, position direction matches signal"}
 
 if __name__ == '__main__':
     try:
