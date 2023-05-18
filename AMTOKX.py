@@ -75,7 +75,15 @@ async def webhook():
 
     if short_position and direction == "Short Entry":
         return {'code': 200, 'message': "No action taken, position direction matches signal"}
-
+    
+    # Check for existing orders
+    orders = tradeAPI.get_order_list(instId=instrument_id)
+    
+    # Cancel all existing orders
+    if orders['data']:
+        for order in orders['data']:
+            tradeAPI.cancel_algo_order([{'algoId': order['algoId'], 'instId': instrument_id}])
+    
     if long_position:
         close_order = await fn.close_position(instrument_id, tradeAPI)
         print(f"Closed long position: {close_order}")

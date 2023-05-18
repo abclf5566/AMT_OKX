@@ -167,7 +167,7 @@ if __name__ == '__main__':
     # 市价仓位全平  Close Positions
     # result = tradeAPI.close_positions('BTC-USDT-210409', 'isolated', 'long', '')
     # 获取订单信息  Get Order Details
-    result = tradeAPI.get_orders('AVAX-USDT-SWAP', ordId=None)
+    #result = tradeAPI.get_orders('AVAX-USDT-SWAP', ordId=None)
     # 获取未成交订单列表  Get Order List
     #result = tradeAPI.get_order_list()
     # 获取历史订单记录（近七天） Get Order History (last 7 days）
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     # 撤销策略委托订单  Cancel Algo Order
     # result = tradeAPI.cancel_algo_order([{'algoId': '297394002194735104', 'instId': 'BTC-USDT-210409'}])
     # 获取未完成策略委托单列表  Get Algo Order List
-    # result = tradeAPI.order_algos_list('conditional', instType='FUTURES')
+    #result = tradeAPI.order_algos_list('conditional', instType='FUTURES')
     # 获取历史策略委托单列表  Get Algo Order History
     # result = tradeAPI.order_algos_history('conditional', 'canceled', instType='FUTURES')
 
