@@ -4,6 +4,7 @@ import okx.Trade as Trade
 import okx.PublicData as Public
 from quart import Quart, request
 import tool.function as fn
+import asyncio
 
 with open("accinfo.json", "r") as f:
     data = json.load(f)
@@ -78,16 +79,42 @@ async def webhook():
     
     await close_positions()
 
+    # 平倉
+    close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position)
+
+    # 检查平仓订单的状态，如果还没有完成，就等待几秒后再检查
+    if close_order_id is not None:
+        wait_count = 0  # count waiting loops
+        while True:
+            # stop waiting if the order is not closed after 30 tries
+            if wait_count > 30:
+                return {'code': 500, 'message': 'Failed to close the order'}
+
+            close_order_info = tradeAPI.get_order(close_order_id)
+            if 'status' in close_order_info and close_order_info['status'] == 'filled':
+                break
+            await asyncio.sleep(2)
+            wait_count += 1
+
+    # 無論是否有平倉操作，接下來進行市價下單
     trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
     max_buy = trade_size["data"][0]["maxBuy"]
+    
+    # Adjust max_buy by a decreasing percentage until the order is successful
+    for i, percentage in enumerate([1, 0.975, 0.95, 0.925, 0.9], 1):
+        adjusted_max_buy = str(int(float(max_buy) * percentage))  # Convert to int as sz only accepts integers
+        order = tradeAPI.place_order(
+            instId=instrument_id,
+            tdMode='isolated',
+            side=side,
+            ordType='market',
+            sz=adjusted_max_buy
+        )
+        if order['code'] != '1':
+            break
+        elif i == 5:  # If it's the last attempt
+            raise Exception('Failed to place order after 5 attempts')
 
-    order = tradeAPI.place_order(
-        instId=instrument_id,
-        tdMode='isolated',
-        side=side,
-        ordType='market',
-        sz=max_buy
-    )
 
     if direction == "Long Entry":
         open_long_order_id = order['data'][0]['ordId']

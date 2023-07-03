@@ -55,13 +55,17 @@ def get_message_code(data, code):
     return None
 
 async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position):
+    close_order_id = None
     if long_position:
         close_order = await close_position(instrument_id, tradeAPI)
         print(f"Closed long position: {close_order}")
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
+            close_order_id = close_order['ordId']  # return the order id if a position was closed
     if short_position:
         close_order = await close_position(instrument_id, tradeAPI)
         print(f"Closed short position: {close_order}")
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
+            close_order_id = close_order['ordId']  # return the order id if a position was closed
+    return close_order_id if close_order_id is not None else None
