@@ -26,14 +26,13 @@ instrument_ids = {
     'OKX:FTMUSDT.P': 'FTM-USDT-SWAP',
     'OKX:CRVUSDT.P': 'CRV-USDT-SWAP'
 }
+
 # 初始化交易信息字典
 trade_info = defaultdict(dict)
 
-open_long_order_id = None
-open_short_order_id = None
-
 @app.route('/webhook', methods=['POST'])
 async def webhook():
+    
     data = await request.get_json()
     if data is None:
         return {'code': 400, 'message': "Bad Request: Invalid JSON data"}
@@ -47,11 +46,6 @@ async def webhook():
     instrument_id = instrument_ids[symbol]
 
     accountAPI.set_leverage(instId=instrument_id, lever=5, mgnMode='isolated')
-
-    # 计算每个交易对的交易额
-    account_balance = accountAPI.get_balance()
-    available_balance = float(account_balance["data"][0]["availBal"])
-    trade_amount = available_balance / len(instrument_ids)
 
     side = None
     if direction == "Long Entry":
@@ -77,7 +71,6 @@ async def webhook():
     elif direction == "Short Entry" and short_position is not None:
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
 
-
     # 修改close_positions函数
     async def close_positions():
         if symbol in trade_info:
@@ -87,37 +80,50 @@ async def webhook():
     if direction == "Exit":
         await close_positions()
         return {'code': 201, 'message': "Order EXIT DONE for " + symbol}
-
-    # Check for existing orders
-    orders = tradeAPI.get_order_list(instId=instrument_id)
         
-    # Cancel all existing orders
-    if orders['data']:
-        for order in orders['data']:
-            tradeAPI.cancel_algo_order([{'algoId': order['algoId'], 'instId': instrument_id}])
-
     await close_positions()
 
-    trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
-    max_buy = min(float(trade_size["data"][0]["maxBuy"]), trade_amount)
 
-    order = tradeAPI.place_order(
-        instId=instrument_id,
-        tdMode='isolated',
-        side=side,
-        ordType='market',
-        sz=str(max_buy)
-    )
+    # Get the list of open positions for the specified instruments
+    positions = [accountAPI.get_positions(instId=instrument_id) for instrument_id in instrument_ids.values()]
+    open_positions = [p for p in positions if p['data']]
+
+    # Calculate the number of available trading pairs
+    available_pairs = 5 - len(open_positions)
+
+    # Get the max balance
+    max_balance = accountAPI.get_max_balance()
+
+    # Calculate the order size
+    order_size = max_balance / available_pairs
+
+    # Loop through each trading pair
+    for instrument_id in instrument_ids.values():
+        # Get the max buy for the trading pair
+        trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
+        max_buy = trade_size["data"][0]["maxBuy"]
+
+        # Adjust max_buy by a decreasing percentage until the order is successful
+        for i, percentage in enumerate([1, 0.975, 0.95, 0.925, 0.9], 1):
+            adjusted_max_buy = str(int(min(float(max_buy) * percentage, order_size)))  # Convert to int as sz only accepts integers
+            order = tradeAPI.place_order(
+                instId=instrument_id,
+                tdMode='isolated',
+                side=side,  # 使用 side 變數
+                ordType='market',
+                sz=adjusted_max_buy
+            )
+            if order['code'] == '0':
+                break
+            elif i == 5:  # If it's the last attempt
+                raise Exception('Failed to place order after 5 attempts')
 
     trade_info[symbol]["order_id"] = order['data'][0]['ordId']
     trade_info[symbol]["direction"] = direction
 
-
     print(order)
 
     return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
-
-
 
 if __name__ == '__main__':
     try:
