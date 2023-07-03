@@ -86,16 +86,6 @@ async def webhook():
 
     # Get the list of open positions for the specified instruments
     positions = [accountAPI.get_positions(instId=instrument_id) for instrument_id in instrument_ids.values()]
-    open_positions = [p for p in positions if p['data']]
-
-    # Calculate the number of available trading pairs
-    available_pairs = 5 - len(open_positions)
-
-    # Get the max balance
-    max_balance = accountAPI.get_max_balance()
-
-    # Calculate the order size
-    order_size = max_balance / available_pairs
 
     # Loop through each trading pair
     for instrument_id in instrument_ids.values():
@@ -104,8 +94,8 @@ async def webhook():
         max_buy = trade_size["data"][0]["maxBuy"]
 
         # Adjust max_buy by a decreasing percentage until the order is successful
-        for i, percentage in enumerate([1, 0.975, 0.95, 0.925, 0.9], 1):
-            adjusted_max_buy = str(int(min(float(max_buy) * percentage, order_size)))  # Convert to int as sz only accepts integers
+        for i, percentage in enumerate([1, 0.99, 0.98, 0.97, 0.96], 1):
+            adjusted_max_buy = str(int(float(max_buy) * percentage))  # Convert to int as sz only accepts integers
             order = tradeAPI.place_order(
                 instId=instrument_id,
                 tdMode='isolated',
