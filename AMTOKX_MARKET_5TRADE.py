@@ -6,6 +6,8 @@ from quart import Quart, request
 import tool.function as fn
 from collections import defaultdict
 import asyncio
+
+
 with open("accinfo.json", "r") as f:
     data = json.load(f)
 with open('instrument_ids.json', 'r') as f:
@@ -89,29 +91,30 @@ async def webhook():
 
         await close_positions()
 
-        # Get the list of open positions for the specified instruments
-        positions = [accountAPI.get_positions(instId=instrument_id) for instrument_id in instrument_ids.values()]
+        # Update trade_info before placing order
+        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
 
-        # Loop through each trading pair
-        for instrument_id in instrument_ids.values():
-            # Get the max buy for the trading pair
-            trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
-            max_buy = trade_size["data"][0]["maxBuy"]
+        # Count the number of trading pairs without positions
+        no_position_count = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
 
-            # Adjust max_buy by a decreasing percentage until the order is successful
-            for i, percentage in enumerate([1, 0.99, 0.98, 0.97, 0.96], 1):
-                adjusted_max_buy = str(int(float(max_buy) * percentage))  # Convert to int as sz only accepts integers
-                order = tradeAPI.place_order(
-                    instId=instrument_id,
-                    tdMode='isolated',
-                    side=side,  # 使用 side 變數
-                    ordType='market',
-                    sz=adjusted_max_buy
-                )
-                if order['code'] == '0':
-                    break
-                elif i == 5:  # If it's the last attempt
-                    raise Exception('Failed to place order after 5 attempts')
+        # Get the max buy for the trading pair
+        trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
+        max_buy = trade_size["data"][0]["maxBuy"]
+
+        # Adjust max_buy by a decreasing percentage until the order is successful
+        for i, percentage in enumerate([1, 0.99, 0.98, 0.97, 0.96], 1):
+            adjusted_max_buy = str(int(float(max_buy) * percentage / no_position_count))  # Convert to int as sz only accepts integers
+            order = tradeAPI.place_order(
+                instId=instrument_id,
+                tdMode='isolated',
+                side=side,  # 使用 side 變數
+                ordType='market',
+                sz=adjusted_max_buy
+            )
+            if order['code'] == '0':
+                break
+            elif i == 5:  # If it's the last attempt
+                raise Exception('Failed to place order after 5 attempts')
 
         trade_info[symbol]["order_id"] = order['data'][0]['ordId']
         trade_info[symbol]["direction"] = direction
@@ -119,6 +122,8 @@ async def webhook():
         print(order)
 
         return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
+
+
 
 if __name__ == '__main__':
     try:
