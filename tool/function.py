@@ -71,3 +71,40 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
             close_order_id = close_order['ordId']  # return the order id if a position was closed
     return close_order_id if close_order_id is not None else None
+
+
+def format_position_info(position):
+    pos = float(position['pos'])
+    if pos > 0:
+        return f"Long position for {position['instId']}: {pos}"
+    elif pos < 0:
+        return f"Short position for {position['instId']}: {-pos}"  # 使用负数使输出为正数
+    else:
+        return f"No position for {position['instId']}"
+
+# 在程序启动时初始化 trade_info
+async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
+    for instrument_id in instrument_ids.values():
+        positions = accountAPI.get_positions(instId=instrument_id)
+        long_position = None
+        short_position = None
+
+        for position in positions['data']:
+            print(format_position_info(position))  # 打印持仓信息
+
+            pos = float(position['pos'])
+            if pos > 0:
+                long_position = position
+            elif pos < 0:
+                short_position = position
+
+        if long_position is not None:
+            trade_info[instrument_id] = {
+                "order_id": long_position['posId'],
+                "direction": "Long Entry"
+            }
+        elif short_position is not None:
+            trade_info[instrument_id] = {
+                "order_id": short_position['posId'],
+                "direction": "Short Entry"
+            }

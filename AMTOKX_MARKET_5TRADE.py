@@ -6,9 +6,10 @@ from quart import Quart, request
 import tool.function as fn
 from collections import defaultdict
 import asyncio
-
 with open("accinfo.json", "r") as f:
     data = json.load(f)
+with open('instrument_ids.json', 'r') as f:
+    instrument_ids = json.load(f)
 
 api_key = data["api_key"]
 secret_key = data["secret_key"]
@@ -20,13 +21,6 @@ tradeAPI = Trade.TradeAPI(api_key, secret_key, passphrase, False, flag)
 publicAPI = Public.PublicAPI(api_key, secret_key, passphrase, False, flag)
 
 app = Quart(__name__)
-instrument_ids = {
-    'ARBUSDT.P': 'ARB-USDT-SWAP',
-    'PEPEUSDT.P': 'PEPE-USDT-SWAP',
-    'APTUSDT.P': 'APT-USDT-SWAP',
-    'WOOUSDT.P': 'WOO-USDT-SWAP',
-    'CELUSDT.P': 'CEL-USDT-SWAP'
-}
 
 # 初始化交易信息字典
 trade_info = defaultdict(dict)
@@ -126,9 +120,10 @@ async def webhook():
 
         return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
 
-
 if __name__ == '__main__':
     try:
+        asyncio.run(fn.initialize_trade_info(instrument_ids,accountAPI,trade_info))
+        print(f"posiction is {trade_info}")
         app.run(host='0.0.0.0', port=8080)
     except (KeyboardInterrupt, SystemExit, GeneratorExit):
         print("Shutting down the server gracefully...")
