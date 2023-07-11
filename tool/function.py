@@ -14,7 +14,9 @@ def get_precision(public_api, inst_id):
     return None
 
 async def close_position(instrument_id, tradeAPI):
+    print(f"Closing position for {instrument_id}...")
     close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+    print(f"Received close order response: {close_order}")
     if close_order['code'] == '51023':
         print('No position to close')
     elif close_order['code'] == '0':

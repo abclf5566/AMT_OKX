@@ -21,11 +21,11 @@ publicAPI = Public.PublicAPI(api_key, secret_key, passphrase, False, flag)
 
 app = Quart(__name__)
 instrument_ids = {
-    'OKX:SOLUSDT.P': 'SOL-USDT-SWAP',
-    'OKX:AAVEUSDT.P': 'AAVE-USDT-SWAP',
-    'OKX:AVAXUSDT.P': 'AVAX-USDT-SWAP',
-    'OKX:FTMUSDT.P': 'FTM-USDT-SWAP',
-    'OKX:CRVUSDT.P': 'CRV-USDT-SWAP'
+    'ARBUSDT.P': 'ARB-USDT-SWAP',
+    'PEPEUSDT.P': 'PEPE-USDT-SWAP',
+    'APTUSDT.P': 'APT-USDT-SWAP',
+    'WOOUSDT.P': 'WOO-USDT-SWAP',
+    'CELUSDT.P': 'CEL-USDT-SWAP'
 }
 
 # 初始化交易信息字典
@@ -59,6 +59,7 @@ async def webhook():
 
         # 在處理新信號之前檢查當前持倉
         positions = accountAPI.get_positions(instId=instrument_id)
+        print(f"Retrieved positions: {positions}")
         long_position = None
         short_position = None
 
@@ -77,14 +78,12 @@ async def webhook():
 
         # 修改close_positions函数
         async def close_positions():
-            if symbol in trade_info:
-                close_order = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position)
-                # 检查关闭操作是否成功
-                if close_order['code'] != '0':
-                    # 如果关闭操作失败，返回一个错误消息
-                    return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
-                trade_info[symbol].clear()
-
+            close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position)
+            # 检查关闭操作是否成功
+            if close_order_id is None:
+                # 如果关闭操作失败，返回一个错误消息
+                return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
+            trade_info[symbol].clear()
         # 在"Exit"处理代码中，添加错误检查
         if direction == "Exit":
             close_result = await close_positions()
@@ -92,6 +91,7 @@ async def webhook():
                 # 如果关闭操作失败，返回错误消息
                 return close_result
             return {'code': 201, 'message': "Order EXIT DONE for " + symbol}
+
 
         await close_positions()
 
@@ -125,6 +125,7 @@ async def webhook():
         print(order)
 
         return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
+
 
 if __name__ == '__main__':
     try:
