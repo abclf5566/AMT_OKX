@@ -1,0 +1,21 @@
+apikey = "e75156e0-7ee7-46db-bb5f-3bdac7ea7d62"
+secretkey = "F0BD6868026E966316A7002610732610"
+IP = ""
+備註名 = "OKX_TEST"
+權限 = "讀取/交易"
+
+
+真實倉位
+{
+    "api_key":"f8eead5e-065b-4c2f-9b80-0d54032fe411",
+    "secret_key":"1C3624876D96ACB191CA09ED2DC2FB97",
+    "passphrase":"!Aa5566288"
+}
+
+模擬倉位
+{
+    "api_key":"e75156e0-7ee7-46db-bb5f-3bdac7ea7d62",
+    "secret_key":"F0BD6868026E966316A7002610732610",
+    "passphrase":"!Aa5566288"
+}
+

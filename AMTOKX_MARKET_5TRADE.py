@@ -9,6 +9,8 @@ import asyncio
 
 with open("accinfo.json", "r") as f:
     data = json.load(f)
+with open('instrument_ids.json', 'r') as f:
+    instrument_ids = json.load(f)
 
 api_key = data["api_key"]
 secret_key = data["secret_key"]
@@ -20,13 +22,6 @@ tradeAPI = Trade.TradeAPI(api_key, secret_key, passphrase, False, flag)
 publicAPI = Public.PublicAPI(api_key, secret_key, passphrase, False, flag)
 
 app = Quart(__name__)
-instrument_ids = {
-    'OKX:SOLUSDT.P': 'SOL-USDT-SWAP',
-    'OKX:AAVEUSDT.P': 'AAVE-USDT-SWAP',
-    'OKX:AVAXUSDT.P': 'AVAX-USDT-SWAP',
-    'OKX:FTMUSDT.P': 'FTM-USDT-SWAP',
-    'OKX:CRVUSDT.P': 'CRV-USDT-SWAP'
-}
 
 # 初始化交易信息字典
 trade_info = defaultdict(dict)
@@ -59,6 +54,7 @@ async def webhook():
 
         # 在處理新信號之前檢查當前持倉
         positions = accountAPI.get_positions(instId=instrument_id)
+        print(f"Retrieved positions: {positions}")
         long_position = None
         short_position = None
 
@@ -77,14 +73,12 @@ async def webhook():
 
         # 修改close_positions函数
         async def close_positions():
-            if symbol in trade_info:
-                close_order = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position)
-                # 检查关闭操作是否成功
-                if close_order['code'] != '0':
-                    # 如果关闭操作失败，返回一个错误消息
-                    return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
-                trade_info[symbol].clear()
-
+            close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids)
+            # 检查关闭操作是否成功
+            if close_order_id is None:
+                # 如果关闭操作失败，返回一个错误消息
+                return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
+            trade_info[symbol].clear()
         # 在"Exit"处理代码中，添加错误检查
         if direction == "Exit":
             close_result = await close_positions()
@@ -95,18 +89,21 @@ async def webhook():
 
         await close_positions()
 
-        # Get the list of open positions for the specified instruments
-        positions = [accountAPI.get_positions(instId=instrument_id) for instrument_id in instrument_ids.values()]
+        # 在这里，即使方向相同，也进行入场操作
+        if direction in ["Long Entry", "Short Entry"]:
+            # Update trade_info before placing order
+            await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
 
-        # Loop through each trading pair
-        for instrument_id in instrument_ids.values():
+            # Count the number of trading pairs without positions
+            no_position_count = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
+
             # Get the max buy for the trading pair
             trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
             max_buy = trade_size["data"][0]["maxBuy"]
 
             # Adjust max_buy by a decreasing percentage until the order is successful
             for i, percentage in enumerate([1, 0.99, 0.98, 0.97, 0.96], 1):
-                adjusted_max_buy = str(int(float(max_buy) * percentage))  # Convert to int as sz only accepts integers
+                adjusted_max_buy = str(int(float(max_buy) * percentage / no_position_count))  # Convert to int as sz only accepts integers
                 order = tradeAPI.place_order(
                     instId=instrument_id,
                     tdMode='isolated',
@@ -119,15 +116,17 @@ async def webhook():
                 elif i == 5:  # If it's the last attempt
                     raise Exception('Failed to place order after 5 attempts')
 
-        trade_info[symbol]["order_id"] = order['data'][0]['ordId']
-        trade_info[symbol]["direction"] = direction
+            trade_info[symbol]["order_id"] = order['data'][0]['ordId']
+            trade_info[symbol]["direction"] = direction
 
-        print(order)
+            print(order)
 
-        return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
+            return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
 
 if __name__ == '__main__':
     try:
+        asyncio.run(fn.initialize_trade_info(instrument_ids,accountAPI,trade_info))
+        print(f"posiction is {trade_info}")
         app.run(host='0.0.0.0', port=8080)
     except (KeyboardInterrupt, SystemExit, GeneratorExit):
         print("Shutting down the server gracefully...")

@@ -1,0 +1,2 @@
+sudo docker build -t amtokx .
+sudo docker run --name 5trade -p 25565:25565 -d amtokx
