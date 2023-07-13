@@ -74,7 +74,7 @@ async def webhook():
 
         # 修改close_positions函数
         async def close_positions():
-            close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position)
+            close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids)
             # 检查关闭操作是否成功
             if close_order_id is None:
                 # 如果关闭操作失败，返回一个错误消息
@@ -88,10 +88,8 @@ async def webhook():
                 return close_result
             return {'code': 201, 'message': "Order EXIT DONE for " + symbol}
 
-
         await close_positions()
-
-        # Update trade_info before placing order
+        # Update trade_info after closing positions
         await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
 
         # Count the number of trading pairs without positions
@@ -112,18 +110,15 @@ async def webhook():
                 sz=adjusted_max_buy
             )
             if order['code'] == '0':
+                trade_info[symbol]["order_id"] = order['data'][0]['ordId']
+                trade_info[symbol]["direction"] = direction
                 break
             elif i == 5:  # If it's the last attempt
                 raise Exception('Failed to place order after 5 attempts')
 
-        trade_info[symbol]["order_id"] = order['data'][0]['ordId']
-        trade_info[symbol]["direction"] = direction
-
         print(order)
 
         return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
-
-
 
 if __name__ == '__main__':
     try:

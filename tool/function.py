@@ -64,7 +64,7 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
             close_order_id = close_order['ordId']  # return the order id if a position was closed
-            for symbol in trade_info.keys():
+            for symbol in list(trade_info.keys()):  # Make a copy of the keys
                 if instrument_ids[symbol] == instrument_id:
                     del trade_info[symbol]
                     break
@@ -75,10 +75,12 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
             close_order_id = close_order['ordId']  # return the order id if a position was closed
-            for symbol in trade_info.keys():
+            for symbol in list(trade_info.keys()):  # Make a copy of the keys
                 if instrument_ids[symbol] == instrument_id:
                     del trade_info[symbol]
+                    print(f"Updated trade_info: {trade_info}")  # Print the updated trade_info
                     break
+
 
     return close_order_id if close_order_id is not None else None
 
