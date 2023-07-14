@@ -66,7 +66,7 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
             close_order_id = close_order['ordId']  # return the order id if a position was closed
             for symbol in trade_info.keys():
                 if instrument_ids[symbol] == instrument_id:
-                    del trade_info[symbol]
+                    trade_info[symbol] = {"order_id": None, "direction": "Short Entry"}
                     break
 
     if short_position:
@@ -77,11 +77,10 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
             close_order_id = close_order['ordId']  # return the order id if a position was closed
             for symbol in trade_info.keys():
                 if instrument_ids[symbol] == instrument_id:
-                    del trade_info[symbol]
+                    trade_info[symbol] = {"order_id": None, "direction": "Long Entry"}
                     break
 
     return close_order_id if close_order_id is not None else None
-
 
 
 def format_position_info(position):
