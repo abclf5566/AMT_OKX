@@ -127,7 +127,7 @@ if __name__ == '__main__':
     try:
         asyncio.run(fn.initialize_trade_info(instrument_ids,accountAPI,trade_info))
         print(f"posiction is {trade_info}")
-        app.run(host='0.0.0.0', port=8080)
+        app.run(host='0.0.0.0', port=25565)
     except (KeyboardInterrupt, SystemExit, GeneratorExit):
         print("Shutting down the server gracefully...")
     except (ConnectionError, TimeoutError) as e:
