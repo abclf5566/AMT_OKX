@@ -89,7 +89,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
         short_position = None
 
         for position in positions['data']:
-            #print(format_position_info(position))  # 打印持仓信息
+            print(format_position_info(position))  # 打印持仓信息
 
             pos = float(position['pos'])
             if pos > 0:
