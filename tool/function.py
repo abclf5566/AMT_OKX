@@ -2,20 +2,10 @@
 
 import asyncio
 
-def get_precision(public_api, inst_id):
-    inst_info = public_api.get_instruments(instType="SWAP")
-    for inst in inst_info['data']:
-        if inst['instId'] == inst_id:
-            tick_sz = inst['tickSz']
-            if '.' in tick_sz:
-                return len(tick_sz.split('.')[1])
-            else:
-                return 0
-    return None
-
 async def close_position(instrument_id, tradeAPI):
     print(f"Closing position for {instrument_id}...")
     close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+    await asyncio.sleep(1)  # add delay here
     print(f"Received close order response: {close_order}")
     if close_order['code'] == '51023':
         print('No position to close')
@@ -65,8 +55,8 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
             close_order_id = close_order['ordId']  # return the order id if a position was closed
             for symbol in trade_info.keys():
-                if instrument_ids[symbol] == instrument_id:
-                    trade_info[symbol] = {"order_id": None, "direction": "Short Entry"}
+                if instrument_ids.get(symbol) == instrument_id:  # 使用 get 方法來避免 KeyError
+                    del trade_info[symbol]
                     break
 
     if short_position:
@@ -76,12 +66,11 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
             close_order_id = close_order['ordId']  # return the order id if a position was closed
             for symbol in trade_info.keys():
-                if instrument_ids[symbol] == instrument_id:
-                    trade_info[symbol] = {"order_id": None, "direction": "Long Entry"}
+                if instrument_ids.get(symbol) == instrument_id:  # 使用 get 方法來避免 KeyError
+                    del trade_info[symbol]
                     break
 
     return close_order_id if close_order_id is not None else None
-
 
 def format_position_info(position):
     pos = float(position['pos'])
@@ -100,7 +89,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
         short_position = None
 
         for position in positions['data']:
-            print(format_position_info(position))  # 打印持仓信息
+            #print(format_position_info(position))  # 打印持仓信息
 
             pos = float(position['pos'])
             if pos > 0:
