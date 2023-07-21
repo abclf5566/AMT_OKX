@@ -104,7 +104,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
                 "direction": "Short Entry"
             }
 
-async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids,symbol,direction):
+async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction):
     # Count the number of trading pairs without positions
     no_position_count = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
 
@@ -124,8 +124,7 @@ async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info,
         )
         if order['code'] == '0':
             # Update trade_info after a successful order
-            trade_info[symbol]["order_id"] = order['data'][0]['ordId']
-            trade_info[symbol]["direction"] = direction
+            trade_info[symbol] = {"order_id": order['data'][0]['ordId'], "direction": direction}
             print(f"Order placed successfully for {symbol}. Order ID: {order['data'][0]['ordId']}")
             break
         elif i == 3:  # If it's the last attempt
