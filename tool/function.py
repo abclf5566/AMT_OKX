@@ -40,12 +40,6 @@ async def wait_for_close_order(accountAPI, instId, posSide):
         else:
             await asyncio.sleep(1)
 
-def get_message_code(data, code):
-    for msg in data['message']:
-        if code in msg:
-            return msg[code]
-    return None
-
 async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids):
     close_order_id = None
     if long_position:
@@ -132,6 +126,7 @@ async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info,
             # Update trade_info after a successful order
             trade_info[symbol]["order_id"] = order['data'][0]['ordId']
             trade_info[symbol]["direction"] = direction
+            print(f"Order placed successfully for {symbol}. Order ID: {order['data'][0]['ordId']}")
             break
         elif i == 3:  # If it's the last attempt
             raise Exception('Failed to place order after 3 attempts')
