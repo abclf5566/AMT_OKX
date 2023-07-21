@@ -62,12 +62,18 @@ async def webhook():
             long_position = position
         elif pos < 0:
             short_position = position
+        await asyncio.sleep(0.2)
 
     # 如果信號方向與當前持倉相同，不執行任何操作
     if direction == "Long Entry" and long_position is not None:
+        # Update trade_info
+        trade_info[symbol] = {"order_id": long_position['posId'], "direction": "Long Entry"}
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
     elif direction == "Short Entry" and short_position is not None:
+        # Update trade_info
+        trade_info[symbol] = {"order_id": short_position['posId'], "direction": "Short Entry"}
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
+
 
     # 修改close_positions函数
     async def close_positions():
@@ -76,8 +82,13 @@ async def webhook():
         if close_order_id is None:
             # 如果关闭操作失败，返回一个错误消息
             return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
-        trade_info[symbol].clear()
-    # 在"Exit"处理代码中，添加错误检查
+
+        # Update trade_info after a successful close operation
+        for key in list(trade_info.keys()):  # Use list to avoid RuntimeError: dictionary changed size during iteration
+            if trade_info[key].get('order_id') == close_order_id:
+                del trade_info[key]
+        return None  # Return None if the operation was successful
+
     if direction == "Exit":
         close_result = await close_positions()
         if close_result is not None:
@@ -85,39 +96,20 @@ async def webhook():
             return close_result
         return {'code': 201, 'message': "Order EXIT DONE for " + symbol}
 
+    close_result = await close_positions()
+    if close_result is not None:
+        # 如果关闭操作失败，返回错误消息
+        return close_result
+
     await close_positions()
 
-    # 在这里，即使方向相同，也进行入场操作
     if direction in ["Long Entry", "Short Entry"]:
-        # Update trade_info before placing order
-        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
+        close_result = await close_positions()
+        if close_result is not None:
+            # 如果关闭操作失败，返回错误消息
+            return close_result
+        await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids,symbol,direction)
 
-        # Count the number of trading pairs without positions
-        no_position_count = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
-
-        # Get the max buy for the trading pair
-        trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
-        max_buy = trade_size["data"][0]["maxBuy"]
-
-        # Adjust max_buy by a decreasing percentage until the order is successful
-        for i, percentage in enumerate([1, 0.98, 0.96], 1):
-            adjusted_max_buy = str(int(float(max_buy) * percentage / no_position_count))  # Convert to int as sz only accepts integers
-            order = tradeAPI.place_order(
-                instId=instrument_id,
-                tdMode='isolated',
-                side=side,  # 使用 side 變數
-                ordType='market',
-                sz=adjusted_max_buy
-            )
-            if order['code'] == '0':
-                break
-            elif i == 3:  # If it's the last attempt
-                raise Exception('Failed to place order after 3 attempts')
-
-        trade_info[symbol]["order_id"] = order['data'][0]['ordId']
-        trade_info[symbol]["direction"] = direction
-
-        print(order)
     # Add a delay between each request
     await asyncio.sleep(1)
 
