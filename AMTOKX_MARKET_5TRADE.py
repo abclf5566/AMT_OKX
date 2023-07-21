@@ -74,7 +74,6 @@ async def webhook():
         trade_info[symbol] = {"order_id": short_position['posId'], "direction": "Short Entry"}
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
 
-
     # 修改close_positions函数
     async def close_positions():
         close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids)
@@ -101,14 +100,13 @@ async def webhook():
         # 如果关闭操作失败，返回错误消息
         return close_result
 
-    await close_positions()
-
+    # If we're not exiting, place new order
     if direction in ["Long Entry", "Short Entry"]:
         close_result = await close_positions()
         if close_result is not None:
             # 如果关闭操作失败，返回错误消息
             return close_result
-        await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids,symbol,direction)
+        await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction)
 
     # Add a delay between each request
     await asyncio.sleep(1)
