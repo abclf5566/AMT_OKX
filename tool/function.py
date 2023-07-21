@@ -48,10 +48,6 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
             close_order_id = close_order['ordId']  # return the order id if a position was closed
-            for symbol in trade_info.keys():
-                if instrument_ids.get(symbol) == instrument_id:  # 使用 get 方法來避免 KeyError
-                    del trade_info[symbol]
-                    break
 
     if short_position:
         close_order = await close_position(instrument_id, tradeAPI)
@@ -59,10 +55,12 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
             close_order_id = close_order['ordId']  # return the order id if a position was closed
-            for symbol in trade_info.keys():
-                if instrument_ids.get(symbol) == instrument_id:  # 使用 get 方法來避免 KeyError
-                    del trade_info[symbol]
-                    break
+
+    if close_order_id is not None:
+        for symbol in trade_info.keys():
+            if instrument_ids.get(symbol) == instrument_id:
+                del trade_info[symbol]
+                break
 
     return close_order_id if close_order_id is not None else None
 

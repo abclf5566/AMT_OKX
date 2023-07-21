@@ -50,7 +50,6 @@ async def webhook():
     elif direction == "Short Entry":
         side = 'sell'
 
-    # 在處理新信號之前檢查當前持倉
     positions = accountAPI.get_positions(instId=instrument_id)
     print(f"Retrieved positions: {positions}")
     long_position = None
@@ -64,29 +63,21 @@ async def webhook():
             short_position = position
         await asyncio.sleep(0.2)
 
-    # 如果信號方向與當前持倉相同，不執行任何操作
     if direction == "Long Entry" and long_position is not None:
-        # Update trade_info
         trade_info[symbol] = {"order_id": long_position['posId'], "direction": "Long Entry"}
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
     elif direction == "Short Entry" and short_position is not None:
-        # Update trade_info
         trade_info[symbol] = {"order_id": short_position['posId'], "direction": "Short Entry"}
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
 
-    # 修改close_positions函数
     async def close_positions():
         close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids)
-        # 检查关闭操作是否成功
         if close_order_id is None:
-            # 如果关闭操作失败，返回一个错误消息
             return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
-
-        # Update trade_info after a successful close operation
-        for key in list(trade_info.keys()):  # Use list to avoid RuntimeError: dictionary changed size during iteration
+        for key in list(trade_info.keys()):
             if trade_info[key].get('order_id') == close_order_id:
                 del trade_info[key]
-        return None  # Return None if the operation was successful
+        return None
 
     if direction == "Exit":
         close_result = await close_positions()
@@ -98,12 +89,12 @@ async def webhook():
     if close_result is not None:
         return close_result
 
-    # If we're not exiting, place new order
     if direction in ["Long Entry", "Short Entry"]:
         await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction)
 
     await asyncio.sleep(1)
     return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
+
 
 if __name__ == '__main__':
     try:
@@ -114,7 +105,3 @@ if __name__ == '__main__':
         print("Shutting down the server gracefully...")
     except (ConnectionError, TimeoutError) as e:
         print(f"Connection or timeout error: {e}")
-    except ValueError as e:
-        print(f"Value error: {e}")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
