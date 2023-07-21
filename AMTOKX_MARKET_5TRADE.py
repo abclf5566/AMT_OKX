@@ -63,21 +63,27 @@ async def webhook():
             short_position = position
         await asyncio.sleep(0.2)
 
+    # 如果信号方向与当前持仓方向相同，不执行任何操作
     if direction == "Long Entry" and long_position is not None:
+        # Update trade_info
         trade_info[symbol] = {"order_id": long_position['posId'], "direction": "Long Entry"}
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
     elif direction == "Short Entry" and short_position is not None:
+        # Update trade_info
         trade_info[symbol] = {"order_id": short_position['posId'], "direction": "Short Entry"}
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
 
+    # 修改close_positions函数
     async def close_positions():
         close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids)
         if close_order_id is None:
             return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
-        for key in list(trade_info.keys()):
+
+        # Update trade_info after a successful close operation
+        for key in list(trade_info.keys()):  # Use list to avoid RuntimeError: dictionary changed size during iteration
             if trade_info[key].get('order_id') == close_order_id:
                 del trade_info[key]
-        return None
+        return None  # Return None if the operation was successful
 
     if direction == "Exit":
         close_result = await close_positions()
@@ -89,7 +95,9 @@ async def webhook():
     if close_result is not None:
         return close_result
 
+    # If we're not exiting, place new order
     if direction in ["Long Entry", "Short Entry"]:
+        # 不需要再次关闭仓位，上面已经处理过了
         await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction)
 
     await asyncio.sleep(1)
