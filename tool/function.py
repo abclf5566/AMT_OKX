@@ -59,10 +59,9 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
     async with trade_info_lock: # 使用鎖來保護共享資源
         if close_order_id is not None:
             # Find the corresponding symbol and delete it from trade_info
-            for symbol in trade_info.keys():
-                if trade_info[symbol].get('order_id') == close_order_id:
-                    del trade_info[symbol]
-                    break
+            keys_to_delete = [symbol for symbol, info in trade_info.items() if info.get('order_id') == close_order_id]
+            for key in keys_to_delete:
+                del trade_info[key]
 
     return close_order_id if close_order_id is not None else None
 
