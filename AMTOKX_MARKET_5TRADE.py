@@ -21,8 +21,9 @@ accountAPI = Account.AccountAPI(api_key, secret_key, passphrase, False, flag)
 tradeAPI = Trade.TradeAPI(api_key, secret_key, passphrase, False, flag)
 publicAPI = Public.PublicAPI(api_key, secret_key, passphrase, False, flag)
 
-# 初始化交易信息字典
+# 初始化交易信息字典和異步鎖
 trade_info = defaultdict(dict)
+trade_info_lock = asyncio.Lock()
 
 app = Quart(__name__)
 
@@ -105,3 +106,7 @@ if __name__ == '__main__':
         print("Shutting down the server gracefully...")
     except (ConnectionError, TimeoutError) as e:
         print(f"Connection or timeout error: {e}")
+    except ValueError as e:
+        print(f"Value error: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
