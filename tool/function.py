@@ -103,7 +103,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
                 "direction": "Short Entry"
             }
 
-async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction):
+async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction,trade_info_lock):
     # Count the number of trading pairs without positions
     no_position_count = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
 
