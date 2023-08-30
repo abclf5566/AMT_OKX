@@ -40,7 +40,7 @@ async def wait_for_close_order(accountAPI, instId, posSide):
         else:
             await asyncio.sleep(1)
 
-async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids):
+async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids, trade_info_lock):
     close_order_id = None
     if long_position:
         close_order = await close_position(instrument_id, tradeAPI)
@@ -56,11 +56,12 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
             close_order_id = close_order['ordId']  # return the order id if a position was closed
 
-    if close_order_id is not None:
-        for symbol in trade_info.keys():
-            if instrument_ids.get(symbol) == instrument_id:
-                del trade_info[symbol]
-                break
+    async with trade_info_lock: # 使用鎖來保護共享資源
+        if close_order_id is not None:
+            # Find the corresponding symbol and delete it from trade_info
+            keys_to_delete = [symbol for symbol, info in trade_info.items() if info.get('order_id') == close_order_id]
+            for key in keys_to_delete:
+                del trade_info[key]
 
     return close_order_id if close_order_id is not None else None
 
@@ -102,7 +103,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
                 "direction": "Short Entry"
             }
 
-async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction):
+async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction,trade_info_lock):
     # Count the number of trading pairs without positions
     no_position_count = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
 
@@ -121,10 +122,11 @@ async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info,
             sz=adjusted_max_buy
         )
         if order['code'] == '0':
-            # Update trade_info after a successful order
-            trade_info[symbol] = {"order_id": order['data'][0]['ordId'], "direction": direction}
-            print(f"Order placed successfully for {symbol}. Order ID: {order['data'][0]['ordId']}")
-            break
+            async with trade_info_lock: # 使用鎖來保護共享資源
+                # Update trade_info after a successful order
+                trade_info[symbol] = {"order_id": order['data'][0]['ordId'], "direction": direction}
+                print(f"Order placed successfully for {symbol}. Order ID: {order['data'][0]['ordId']}")
+                break
         elif i == 3:  # If it's the last attempt
             raise Exception('Failed to place order after 3 attempts')
         await asyncio.sleep(1)  # Add a delay after each attempt

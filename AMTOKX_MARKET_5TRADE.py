@@ -21,8 +21,9 @@ accountAPI = Account.AccountAPI(api_key, secret_key, passphrase, False, flag)
 tradeAPI = Trade.TradeAPI(api_key, secret_key, passphrase, False, flag)
 publicAPI = Public.PublicAPI(api_key, secret_key, passphrase, False, flag)
 
-# 初始化交易信息字典
+# 初始化交易信息字典和異步鎖
 trade_info = defaultdict(dict)
+trade_info_lock = asyncio.Lock()
 
 app = Quart(__name__)
 
@@ -75,7 +76,7 @@ async def webhook():
 
     # 修改close_positions函数
     async def close_positions():
-        close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids)
+        close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids, trade_info_lock)
         if close_order_id is None:
             return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
 
@@ -113,3 +114,7 @@ if __name__ == '__main__':
         print("Shutting down the server gracefully...")
     except (ConnectionError, TimeoutError) as e:
         print(f"Connection or timeout error: {e}")
+    except ValueError as e:
+        print(f"Value error: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
