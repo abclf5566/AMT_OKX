@@ -72,7 +72,7 @@ async def webhook():
         return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
 
     async def close_positions():
-        close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids)
+        close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids, trade_info_lock)
         if close_order_id is None:
             return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
         for key in list(trade_info.keys()):
