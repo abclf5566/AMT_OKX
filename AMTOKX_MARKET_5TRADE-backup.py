@@ -29,7 +29,7 @@ app = Quart(__name__)
 
 # Set leverage at the start of the program
 for instrument_id in instrument_ids.values():
-    accountAPI.set_leverage(instId=instrument_id, lever=5, mgnMode='isolated')
+    accountAPI.set_leverage(instId=instrument_id, lever=10, mgnMode='isolated')
 
 @app.route('/webhook', methods=['POST'])
 async def webhook():
@@ -92,15 +92,14 @@ async def webhook():
             return close_result
         return {'code': 201, 'message': "Order EXIT DONE for " + symbol}
 
-    if long_position is not None or short_position is not None:
-        close_result = await close_positions()
-        if close_result is not None:
-            return close_result
+    close_result = await close_positions()
+    if close_result is not None:
+        return close_result
 
     # If we're not exiting, place new order
     if direction in ["Long Entry", "Short Entry"]:
         # 不需要再次关闭仓位，上面已经处理过了
-        await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction,trade_info_lock)
+        await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction)
 
     await asyncio.sleep(1)
     return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
