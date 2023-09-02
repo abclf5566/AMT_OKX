@@ -87,20 +87,32 @@ async def webhook():
         return None  # Return None if the operation was successful
 
     if direction == "Exit":
-        close_result = await close_positions()
-        if close_result is not None:
-            return close_result
-        return {'code': 201, 'message': "Order EXIT DONE for " + symbol}
+        if symbol in trade_info:
+            # 如果有持倉，進行平倉操作
+            close_result = await close_positions()
+            if close_result is not None:
+                return close_result
+            return {'code': 201, 'message': f"Order EXIT DONE for {symbol}"}
+        else:
+            # 如果没有持倉，不需要操作
+            return {'code': 200, 'message': f"No position to exit for {symbol}"}
 
-    if long_position is not None or short_position is not None:
-        close_result = await close_positions()
-        if close_result is not None:
-            return close_result
-
-    # If we're not exiting, place new order
-    if direction in ["Long Entry", "Short Entry"]:
-        # 不需要再次关闭仓位，上面已经处理过了
-        await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction,trade_info_lock)
+    if symbol in trade_info:
+        current_direction = trade_info[symbol].get("direction", None)
+        if current_direction:
+            if current_direction == direction:  # 如果方向相同，不做操作
+                return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
+            else:  # 如果方向不同，平倉然後反向下單
+                close_result = await close_positions()
+                if close_result is not None:
+                    return close_result
+                await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
+        else:
+            # 如果trade_info中没有這個交易對的方向信息，直接下單
+            await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
+    else:
+        # 如果trade_info中没有這個交易對，直接下單
+        await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
 
     await asyncio.sleep(1)
     return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
