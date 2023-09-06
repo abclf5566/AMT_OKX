@@ -44,12 +44,12 @@ async def webhook():
         return {'code': 400, 'message': f"Bad Request: Invalid symbol {symbol}"}
 
     instrument_id = instrument_ids[symbol]
+    side = 'buy' if direction == "Long Entry" else 'sell'
 
-    side = None
-    if direction == "Long Entry":
-        side = 'buy'
-    elif direction == "Short Entry":
-        side = 'sell'
+    # Retrieve existing position information from trade_info
+    current_trade_info = trade_info.get(symbol, {})
+    long_position = current_trade_info.get("Long Entry", None)
+    short_position = current_trade_info.get("Short Entry", None)
 
     positions = accountAPI.get_positions(instId=instrument_id)
     print(f"Retrieved positions: {positions}")
@@ -114,8 +114,25 @@ async def webhook():
         # 如果trade_info中没有這個交易對，直接下單
         await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
 
+    if direction == "Position":
+        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
+        if not trade_info:
+            return {'code': 200, 'message': "目前沒有持倉"}
+        else:
+            position_messages = []
+            for inst_id, info in trade_info.items():
+                if info['direction'] not in ["Long Entry", "Short Entry"]:
+                    continue  # skip entries with incorrect direction
+                msg = f"交易對:{inst_id} 交易編號:{info['order_id']} 倉位方向:{info['direction']}"
+                position_messages.append(msg)
+            formatted_message = " | ".join(position_messages)
+            return {'code': 200, 'message': formatted_message}
+
+
     await asyncio.sleep(1)
     return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
+
+    
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
