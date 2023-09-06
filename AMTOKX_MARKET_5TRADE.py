@@ -38,9 +38,34 @@ async def webhook():
         return {'code': 400, 'message': "Bad Request: Invalid JSON data"}
 
     direction = data['direction']
-    symbol = data['symbol']
 
-    if symbol not in instrument_ids:
+    #Get position from Webhook
+    if direction == "Position":
+        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
+        if not trade_info:
+            return {'code': 200, 'message': "目前沒有持倉"}
+        else:
+            position_messages = []
+            for inst_id, info in trade_info.items():
+                if info['direction'] not in ["Long Entry", "Short Entry"]:
+                    continue  # skip entries with incorrect direction
+                # Additional checks to ensure the information is valid
+                if 'order_id' in info and info['order_id']:
+                    msg = f"交易對:{inst_id} 交易編號:{info['order_id']} 倉位方向:{info['direction']}"
+                    position_messages.append(msg)
+            if not position_messages:
+                return {'code': 200, 'message': "目前沒有有效的持倉"}
+            formatted_message = " | ".join(position_messages)
+            return {'code': 200, 'message': formatted_message}
+
+
+    try:
+        symbol = data['symbol']
+    except KeyError:
+        print('Bad Request: Invalid symbol. Need symbol')
+        symbol = None  # Assign None only in case of an exception
+
+    if symbol is None or symbol not in instrument_ids:
         return {'code': 400, 'message': f"Bad Request: Invalid symbol {symbol}"}
 
     instrument_id = instrument_ids[symbol]
@@ -64,6 +89,8 @@ async def webhook():
             short_position = position
         await asyncio.sleep(0.2)
 
+
+        
     # 如果信号方向与当前持仓方向相同，不执行任何操作
     if direction == "Long Entry" and long_position is not None:
         # Update trade_info
@@ -114,25 +141,8 @@ async def webhook():
         # 如果trade_info中没有這個交易對，直接下單
         await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
 
-    if direction == "Position":
-        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
-        if not trade_info:
-            return {'code': 200, 'message': "目前沒有持倉"}
-        else:
-            position_messages = []
-            for inst_id, info in trade_info.items():
-                if info['direction'] not in ["Long Entry", "Short Entry"]:
-                    continue  # skip entries with incorrect direction
-                msg = f"交易對:{inst_id} 交易編號:{info['order_id']} 倉位方向:{info['direction']}"
-                position_messages.append(msg)
-            formatted_message = " | ".join(position_messages)
-            return {'code': 200, 'message': formatted_message}
-
-
     await asyncio.sleep(1)
     return {'code': 202, 'message': "Long Entry / Short Entry DONE"}
-
-    
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
