@@ -1,3 +1,4 @@
+
 # tool/function.py
 
 import asyncio
@@ -42,28 +43,32 @@ async def wait_for_close_order(accountAPI, instId, posSide):
 
 async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids, trade_info_lock):
     close_order_id = None
+    closed = False  # 用于确认是否成功平仓
+
     if long_position:
         close_order = await close_position(instrument_id, tradeAPI)
         print(f"Closed long position: {close_order}")
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
-            close_order_id = close_order['ordId']  # return the order id if a position was closed
+            closed = True  # 更新状态为已成功平仓
 
     if short_position:
         close_order = await close_position(instrument_id, tradeAPI)
         print(f"Closed short position: {close_order}")
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
-            close_order_id = close_order['ordId']  # return the order id if a position was closed
+            closed = True  # 更新状态为已成功平仓
 
-    async with trade_info_lock: # 使用鎖來保護共享資源
-        if close_order_id is not None:
-            # Find the corresponding symbol and delete it from trade_info
-            keys_to_delete = [symbol for symbol, info in trade_info.items() if info.get('order_id') == close_order_id]
+
+    async with trade_info_lock:  # 使用锁来保护共享资源
+        if closed:
+            print("Attempting to update trade_info for closed position.")  # New log line
+            keys_to_delete = [symbol for symbol, info in trade_info.items() if info.get('instrument_id') == instrument_id]
             for key in keys_to_delete:
                 del trade_info[key]
+            print(f"Updated trade_info: {trade_info}")  # New log line
 
-    return close_order_id if close_order_id is not None else None
+    return "Closed" if closed else "Failed to close any position"
 
 def format_position_info(position):
     pos = float(position['pos'])

@@ -58,7 +58,6 @@ async def webhook():
             formatted_message = " | ".join(position_messages)
             return {'code': 200, 'message': formatted_message}
 
-
     try:
         symbol = data['symbol']
     except KeyError:
@@ -89,8 +88,6 @@ async def webhook():
             short_position = position
         await asyncio.sleep(0.2)
 
-
-        
     # 如果信号方向与当前持仓方向相同，不执行任何操作
     if direction == "Long Entry" and long_position is not None:
         # Update trade_info
