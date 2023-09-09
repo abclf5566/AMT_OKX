@@ -64,6 +64,7 @@ async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_po
             keys_to_delete = [symbol for symbol, info in trade_info.items() if info.get('order_id') == close_order_id]
             for key in keys_to_delete:
                 del trade_info[key]
+            print(f"Debug: trade_info after deletion = {trade_info}")  # Debugging line
 
     return close_order_id if closed else None  # 返回 close_order_id 或 None
 
@@ -78,8 +79,10 @@ def format_position_info(position):
         return f"No position for {position['instId']}"
 
 # 在程序启动时初始化 trade_info
-async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
-    for instrument_id in instrument_ids.values():
+async def initialize_trade_info(instrument_ids, accountAPI, trade_info, specific_instrument_id=None):
+    ids_to_update = [specific_instrument_id] if specific_instrument_id else instrument_ids.values()
+
+    for instrument_id in ids_to_update:
         positions = accountAPI.get_positions(instId=instrument_id)
         long_position = None
         short_position = None
@@ -92,7 +95,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
                 long_position = position
             elif pos < 0:
                 short_position = position
-            
+
             await asyncio.sleep(0.2)  # Add a delay after each position
 
         if long_position is not None:
@@ -105,6 +108,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
                 "order_id": short_position['posId'],
                 "direction": "Short Entry"
             }
+
 
 async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction,trade_info_lock):
     # Count the number of trading pairs without positions

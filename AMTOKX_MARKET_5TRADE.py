@@ -32,6 +32,7 @@ for instrument_id in instrument_ids.values():
     accountAPI.set_leverage(instId=instrument_id, lever=5, mgnMode='isolated')
 
 @app.route('/webhook', methods=['POST'])
+
 async def webhook():
     data = await request.get_json()
     if data is None:
@@ -70,72 +71,74 @@ async def webhook():
     instrument_id = instrument_ids[symbol]
     side = 'buy' if direction == "Long Entry" else 'sell'
 
-    # Retrieve existing position information from trade_info
-    current_trade_info = trade_info.get(symbol, {})
+    # 更新 trade_info
+    await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info, specific_instrument_id=instrument_id)
+    print(f"Debug: Updated trade_info = {trade_info}")  # Debugging line
+    current_trade_info = trade_info.get(instrument_id, {})
+
+    if not current_trade_info:
+        print("current_trade_info is empty")
+    else:
+        print(f"Debug: current_trade_info = {current_trade_info}, direction = {direction}")  # Debugging line
+        if direction in ["Long Entry", "Short Entry"] and current_trade_info.get("direction") == direction:
+            return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
+
     long_position = current_trade_info.get("Long Entry", None)
     short_position = current_trade_info.get("Short Entry", None)
 
-    positions = accountAPI.get_positions(instId=instrument_id)
-    print(f"Retrieved positions: {positions}")
-    long_position = None
-    short_position = None
-
-    for position in positions['data']:
-        pos = float(position['pos'])
-        if pos > 0:
-            long_position = position
-        elif pos < 0:
-            short_position = position
-        await asyncio.sleep(0.2)
-
-    # 如果信号方向与当前持仓方向相同，不执行任何操作
-    if direction == "Long Entry" and long_position is not None:
-        # Update trade_info
-        trade_info[symbol] = {"order_id": long_position['posId'], "direction": "Long Entry"}
-        return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
-    elif direction == "Short Entry" and short_position is not None:
-        # Update trade_info
-        trade_info[symbol] = {"order_id": short_position['posId'], "direction": "Short Entry"}
-        return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
-
     # 修改close_positions函数
-    async def close_positions():
-        close_order_id = await fn.close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids, trade_info_lock)
-        if close_order_id is None:
-            return {'code': 500, 'message': f"Failed to close positions for symbol {symbol}"}
+    async def close_position(instrument_id, tradeAPI):
+        print(f"Closing position for {instrument_id}...")
+        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+        await asyncio.sleep(1)  # add delay here
+        print(f"Received close order response: {close_order}")
+        if close_order['code'] == '51023':
+            print('No position to close')
+        elif close_order['code'] == '0':
+            print('Position closed')
+        else:
+            print(f"Unexpected response: {close_order}")
+            raise Exception(f"Failed to close position for {instrument_id}. Response: {close_order}")
 
-        # Update trade_info after a successful close operation
-        for key in list(trade_info.keys()):  # Use list to avoid RuntimeError: dictionary changed size during iteration
-            if trade_info[key].get('order_id') == close_order_id:
-                del trade_info[key]
-        return None  # Return None if the operation was successful
+    # 在收到 "Exit" 指令時
 
     if direction == "Exit":
-        if symbol in trade_info:
-            # 如果有持倉，進行平倉操作
-            close_result = await close_positions()
-            if close_result is not None:
-                return close_result
+        # 重新获取持仓信息
+        positions = accountAPI.get_positions(instId=instrument_id)
+        long_position = None
+        short_position = None
+
+        for position in positions['data']:
+            pos = float(position['pos'])
+            if pos > 0:
+                long_position = position
+            elif pos < 0:
+                short_position = position
+
+        if long_position or short_position:  # 如果有持仓
+            await close_position(instrument_id, tradeAPI)
+            
+            # 删除 trade_info 中的条目
+            async with trade_info_lock:
+                if instrument_id in trade_info:
+                    del trade_info[instrument_id]
+                    
+            print(f"Debug: Updated trade_info after Exit = {trade_info}")  # Debugging line
             return {'code': 201, 'message': f"Order EXIT DONE for {symbol}"}
-        else:
-            # 如果没有持倉，不需要操作
+        else:  # 如果没有持仓
             return {'code': 200, 'message': f"No position to exit for {symbol}"}
 
-    if symbol in trade_info:
-        current_direction = trade_info[symbol].get("direction", None)
-        if current_direction:
-            if current_direction == direction:  # 如果方向相同，不做操作
-                return {'code': 200, 'message': '無需執行操作，持倉方向與信號相符'}
-            else:  # 如果方向不同，平倉然後反向下單
-                close_result = await close_positions()
-                if close_result is not None:
-                    return close_result
-                await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
-        else:
-            # 如果trade_info中没有這個交易對的方向信息，直接下單
+
+    # 如果 trade_info 中有這個交易對的方向信息
+    current_direction = current_trade_info.get("direction", None)
+    if current_direction:
+        if current_direction != direction:  # 如果方向不同，平倉然後反向下單
+            close_result = await close_position(instrument_id, tradeAPI)
+            if close_result is not None:
+                return close_result
             await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
     else:
-        # 如果trade_info中没有這個交易對，直接下單
+        # 如果 trade_info 中没有這個交易對的方向信息，直接下單
         await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
 
     await asyncio.sleep(1)
