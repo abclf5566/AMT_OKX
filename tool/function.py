@@ -111,20 +111,21 @@ async def initialize_trade_info(instrument_ids, accountAPI, trade_info, specific
 
 
 async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction,trade_info_lock):
-    # Count the number of trading pairs without positions
-    no_position_count = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
+    # 使用临时变量而不是直接使用 trade_info
+    no_position_count_tmp = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
+    if instrument_id not in trade_info or trade_info[instrument_id].get('order_id') is None:
+        no_position_count_tmp += 1  # 如果当前交易对没有持仓，加1
 
     # Get the max buy for the trading pair
     trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
     max_buy = trade_size["data"][0]["maxBuy"]
 
-    # Adjust max_buy by a decreasing percentage until the order is successful
     for i, percentage in enumerate([1, 0.98, 0.96], 1):
-        adjusted_max_buy = str(int(float(max_buy) * percentage / no_position_count))  # Convert to int as sz only accepts integers
+        adjusted_max_buy = str(int(float(max_buy) * percentage / no_position_count_tmp))  # 使用临时变量
         order = tradeAPI.place_order(
             instId=instrument_id,
             tdMode='isolated',
-            side=side,  # 使用 side 變數
+            side=side,
             ordType='market',
             sz=adjusted_max_buy
         )
