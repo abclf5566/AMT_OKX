@@ -1,3 +1,4 @@
+
 # tool/function.py
 
 import asyncio
@@ -41,29 +42,32 @@ async def wait_for_close_order(accountAPI, instId, posSide):
             await asyncio.sleep(1)
 
 async def close_positions_if_exists(instrument_id, tradeAPI, accountAPI, long_position, short_position, trade_info, instrument_ids, trade_info_lock):
-    close_order_id = None
+    close_order_id = None  # 初始化
+    closed = False
+
     if long_position:
         close_order = await close_position(instrument_id, tradeAPI)
-        print(f"Closed long position: {close_order}")
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
-            close_order_id = close_order['ordId']  # return the order id if a position was closed
+            closed = True
+            close_order_id = close_order['ordId']  # 更新 close_order_id
 
     if short_position:
         close_order = await close_position(instrument_id, tradeAPI)
-        print(f"Closed short position: {close_order}")
         if close_order['code'] == '0':
             await wait_for_close_order(accountAPI, close_order['instId'], close_order['posSide'])
-            close_order_id = close_order['ordId']  # return the order id if a position was closed
+            closed = True
+            close_order_id = close_order['ordId']  # 更新 close_order_id
 
-    async with trade_info_lock: # 使用鎖來保護共享資源
-        if close_order_id is not None:
-            # Find the corresponding symbol and delete it from trade_info
+    async with trade_info_lock:
+        if closed:
             keys_to_delete = [symbol for symbol, info in trade_info.items() if info.get('order_id') == close_order_id]
             for key in keys_to_delete:
                 del trade_info[key]
+            print(f"Debug: trade_info after deletion = {trade_info}")  # Debugging line
 
-    return close_order_id if close_order_id is not None else None
+    return close_order_id if closed else None  # 返回 close_order_id 或 None
+
 
 def format_position_info(position):
     pos = float(position['pos'])
@@ -75,8 +79,10 @@ def format_position_info(position):
         return f"No position for {position['instId']}"
 
 # 在程序启动时初始化 trade_info
-async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
-    for instrument_id in instrument_ids.values():
+async def initialize_trade_info(instrument_ids, accountAPI, trade_info, specific_instrument_id=None):
+    ids_to_update = [specific_instrument_id] if specific_instrument_id else instrument_ids.values()
+
+    for instrument_id in ids_to_update:
         positions = accountAPI.get_positions(instId=instrument_id)
         long_position = None
         short_position = None
@@ -89,7 +95,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
                 long_position = position
             elif pos < 0:
                 short_position = position
-            
+
             await asyncio.sleep(0.2)  # Add a delay after each position
 
         if long_position is not None:
@@ -102,6 +108,7 @@ async def initialize_trade_info(instrument_ids,accountAPI,trade_info):
                 "order_id": short_position['posId'],
                 "direction": "Short Entry"
             }
+
 
 async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction,trade_info_lock):
     # Count the number of trading pairs without positions
@@ -124,7 +131,7 @@ async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info,
         if order['code'] == '0':
             async with trade_info_lock: # 使用鎖來保護共享資源
                 # Update trade_info after a successful order
-                trade_info[symbol] = {"order_id": order['data'][0]['ordId'], "direction": direction}
+                trade_info[instrument_id] = {"order_id": order['data'][0]['ordId'], "direction": direction}
                 print(f"Order placed successfully for {symbol}. Order ID: {order['data'][0]['ordId']}")
                 break
         elif i == 3:  # If it's the last attempt
