@@ -109,32 +109,31 @@ async def initialize_trade_info(instrument_ids, accountAPI, trade_info, specific
                 "direction": "Short Entry"
             }
 
+async def update_no_position_count(trade_info, instrument_ids, instrument_id, accountAPI):
+    await initialize_trade_info(instrument_ids, accountAPI, trade_info, specific_instrument_id=instrument_id)
+    return sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
 
-async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction,trade_info_lock):
-    # 使用临时变量而不是直接使用 trade_info
-    no_position_count_tmp = sum(1 for inst_id in instrument_ids.values() if inst_id not in trade_info or trade_info[inst_id].get('order_id') is None)
-    if instrument_id not in trade_info or trade_info[instrument_id].get('order_id') is None:
-        no_position_count_tmp += 1  # 如果当前交易对没有持仓，加1
-
+async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock):
     # Get the max buy for the trading pair
     trade_size = accountAPI.get_max_order_size(instId=instrument_id, tdMode='isolated')
-    max_buy = trade_size["data"][0]["maxBuy"]
+    max_buy = float(trade_size["data"][0]["maxBuy"])
+
+    # Update no_position_count_tmp
+    no_pos_cnt = await update_no_position_count(trade_info, instrument_ids, instrument_id, accountAPI)
+    if no_pos_cnt == 0:
+        print("Error: no_position_count_tmp is zero.")
+        return  # Or raise Exception("no_position_count_tmp is zero.")
 
     for i, percentage in enumerate([1, 0.98, 0.96], 1):
-        adjusted_max_buy = str(int(float(max_buy) * percentage / no_position_count_tmp))  # 使用临时变量
-        order = tradeAPI.place_order(
-            instId=instrument_id,
-            tdMode='isolated',
-            side=side,
-            ordType='market',
-            sz=adjusted_max_buy
-        )
+        adjusted_max_buy = str(int(max_buy * percentage / no_pos_cnt))
+        order = tradeAPI.place_order(instId=instrument_id, tdMode='isolated', side=side, ordType='market', sz=adjusted_max_buy)
+        
         if order['code'] == '0':
-            async with trade_info_lock: # 使用鎖來保護共享資源
-                # Update trade_info after a successful order
+            async with trade_info_lock:
                 trade_info[instrument_id] = {"order_id": order['data'][0]['ordId'], "direction": direction}
                 print(f"Order placed successfully for {symbol}. Order ID: {order['data'][0]['ordId']}")
                 break
-        elif i == 3:  # If it's the last attempt
+        elif i == 3:
             raise Exception('Failed to place order after 3 attempts')
-        await asyncio.sleep(1)  # Add a delay after each attempt
+        
+        await asyncio.sleep(1)
