@@ -1,3 +1,4 @@
+
 import json
 import okx.Account as Account
 import okx.Trade as Trade
@@ -21,7 +22,9 @@ accountAPI = Account.AccountAPI(api_key, secret_key, passphrase, False, flag)
 tradeAPI = Trade.TradeAPI(api_key, secret_key, passphrase, False, flag)
 publicAPI = Public.PublicAPI(api_key, secret_key, passphrase, False, flag)
 
+# 初始化交易信息字典和異步鎖
 trade_info = defaultdict(dict)
+trade_info_lock = asyncio.Lock()
 
 app = Quart(__name__)
 
@@ -40,7 +43,7 @@ async def webhook():
 
     #Get position from Webhook
     if direction == "Position":
-        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
+        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info, trade_info_lock)
         if not trade_info:
             return {'code': 200, 'message': "目前沒有持倉"}
         else:
@@ -70,7 +73,7 @@ async def webhook():
     side = 'buy' if direction == "Long Entry" else 'sell'
 
     # 更新 trade_info
-    await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info, specific_instrument_id=instrument_id)
+    await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info,trade_info_lock, specific_instrument_id=instrument_id)
     print(f"Debug: Updated trade_info = {trade_info}")  # Debugging line
     current_trade_info = trade_info.get(instrument_id, {})
 
@@ -83,6 +86,20 @@ async def webhook():
 
     long_position = current_trade_info.get("Long Entry", None)
     short_position = current_trade_info.get("Short Entry", None)
+
+    # 修改close_positions函数
+    async def close_position(instrument_id, tradeAPI):
+        print(f"Closing position for {instrument_id}...")
+        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
+        await asyncio.sleep(1)  # add delay here
+        print(f"Received close order response: {close_order}")
+        if close_order['code'] == '51023':
+            print('No position to close')
+        elif close_order['code'] == '0':
+            print('Position closed')
+        else:
+            print(f"Unexpected response: {close_order}")
+            raise Exception(f"Failed to close position for {instrument_id}. Response: {close_order}")
 
     # 在收到 "Exit" 指令時
 
@@ -100,7 +117,7 @@ async def webhook():
                 short_position = position
 
         if long_position or short_position:  # 如果有持仓
-            await fn.close_position(instrument_id, tradeAPI)
+            await close_position(instrument_id, tradeAPI)
             
             # 删除 trade_info 中的条目
             async with trade_info_lock:
@@ -117,7 +134,7 @@ async def webhook():
     current_direction = current_trade_info.get("direction", None)
     if current_direction:
         if current_direction != direction:  # 如果方向不同，平倉然後反向下單
-            close_result = await fn.close_position(instrument_id, tradeAPI)
+            close_result = await close_position(instrument_id, tradeAPI)
             if close_result is not None:
                 return close_result
             await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
@@ -130,9 +147,8 @@ async def webhook():
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    trade_info_lock = asyncio.Lock(loop=loop)
     try:
-        loop.run_until_complete(fn.initialize_trade_info(instrument_ids, accountAPI, trade_info))
+        loop.run_until_complete(fn.initialize_trade_info(instrument_ids, accountAPI, trade_info,trade_info_lock))
         print(f"Position is {trade_info}")
         app.run(host='0.0.0.0', port=25565)
     except (KeyboardInterrupt, SystemExit, GeneratorExit):
