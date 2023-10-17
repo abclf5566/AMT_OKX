@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["python", "AMTOKX.py"]
+CMD ["python", "AMTOKX_MARKET_5TRADE.py"]
