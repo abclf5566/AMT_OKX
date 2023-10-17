@@ -1,3 +1,4 @@
+
 import json
 import okx.Account as Account
 import okx.Trade as Trade
@@ -42,7 +43,7 @@ async def webhook():
 
     #Get position from Webhook
     if direction == "Position":
-        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info)
+        await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info, trade_info_lock)
         if not trade_info:
             return {'code': 200, 'message': "目前沒有持倉"}
         else:
@@ -72,7 +73,7 @@ async def webhook():
     side = 'buy' if direction == "Long Entry" else 'sell'
 
     # 更新 trade_info
-    await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info, specific_instrument_id=instrument_id)
+    await fn.initialize_trade_info(instrument_ids, accountAPI, trade_info,trade_info_lock, specific_instrument_id=instrument_id)
     print(f"Debug: Updated trade_info = {trade_info}")  # Debugging line
     current_trade_info = trade_info.get(instrument_id, {})
 
@@ -147,7 +148,7 @@ async def webhook():
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(fn.initialize_trade_info(instrument_ids, accountAPI, trade_info))
+        loop.run_until_complete(fn.initialize_trade_info(instrument_ids, accountAPI, trade_info,trade_info_lock))
         print(f"Position is {trade_info}")
         app.run(host='0.0.0.0', port=25565)
     except (KeyboardInterrupt, SystemExit, GeneratorExit):
