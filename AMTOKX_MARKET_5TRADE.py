@@ -87,20 +87,6 @@ async def webhook():
     long_position = current_trade_info.get("Long Entry", None)
     short_position = current_trade_info.get("Short Entry", None)
 
-    # 修改close_positions函数
-    async def close_position(instrument_id, tradeAPI):
-        print(f"Closing position for {instrument_id}...")
-        close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
-        await asyncio.sleep(1)  # add delay here
-        print(f"Received close order response: {close_order}")
-        if close_order['code'] == '51023':
-            print('No position to close')
-        elif close_order['code'] == '0':
-            print('Position closed')
-        else:
-            print(f"Unexpected response: {close_order}")
-            raise Exception(f"Failed to close position for {instrument_id}. Response: {close_order}")
-
     # 在收到 "Exit" 指令時
 
     if direction == "Exit":
@@ -117,7 +103,7 @@ async def webhook():
                 short_position = position
 
         if long_position or short_position:  # 如果有持仓
-            await close_position(instrument_id, tradeAPI)
+            await fn.close_position(instrument_id, tradeAPI)
             
             # 删除 trade_info 中的条目
             async with trade_info_lock:
@@ -134,7 +120,7 @@ async def webhook():
     current_direction = current_trade_info.get("direction", None)
     if current_direction:
         if current_direction != direction:  # 如果方向不同，平倉然後反向下單
-            close_result = await close_position(instrument_id, tradeAPI)
+            close_result = await fn.close_position(instrument_id, tradeAPI)
             if close_result is not None:
                 return close_result
             await fn.place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info, instrument_ids, symbol, direction, trade_info_lock)
