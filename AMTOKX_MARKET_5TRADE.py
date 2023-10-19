@@ -8,10 +8,10 @@ import tool.function as fn
 from collections import defaultdict
 import asyncio
 
-with open("accinfo.json", "r") as f:
-    data = json.load(f)
-with open('instrument_ids.json', 'r') as f:
-    instrument_ids = json.load(f)
+with open("accinfo.json", "r") as f1, open('instrument_ids.json', 'r') as f2:
+    data = json.load(f1)
+    instrument_ids = json.load(f2)
+
 
 api_key = data["api_key"]
 secret_key = data["secret_key"]
