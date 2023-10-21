@@ -5,7 +5,7 @@ import asyncio
 async def close_position(instrument_id, tradeAPI):
     print(f"Closing position for {instrument_id}...")
     close_order = tradeAPI.close_positions(instId=instrument_id, ccy='USDT', mgnMode="isolated")
-    await asyncio.sleep(1)  # add delay here
+    await asyncio.sleep(0.2)  # add delay here
     print(f"Received close order response: {close_order}")
     if close_order['code'] == '51023':
         print('No position to close')
@@ -38,7 +38,7 @@ async def wait_for_close_order(accountAPI, instId, posSide):
         if not position_exists:
             break
         else:
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.2)
 
 def format_position_info(position):
     pos = float(position['pos'])
@@ -109,4 +109,4 @@ async def place_new_order(instrument_id, side, accountAPI, tradeAPI, trade_info,
         elif i == 3:
             raise Exception('Failed to place order after 3 attempts')
         
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.2)
